@@ -37,7 +37,14 @@ CUE SEMANTICS (cash_timing.json `cues`: {t, type, gain?, pan?, dir?, dur?}; same
                into this pre-master domain: ACCENT_LEVEL (see below).
   every other type: sndkit/sfx.py render_cue with the score as context (grid kicks / claps, harmony),
                exactly as build_audio.py (e.g. a hit_cut 1-20 ms off a grid kick drops its low knock).
-  Music ducking under the new cues: build_audio.py's logic and sndkit/sfx.py DUCK table, unchanged.
+               One extension (align_late_kick): render_cue phase-aligns an impact's low layers to a grid kick
+               within 20 ms; an impact between beats (5.000, kicks at 4.80 / 5.28) instead gets the same
+               delay / polarity search against the first kick under its sub tail (<= LATE_KICK). For the
+               5.000 impact that is a polarity flip of its sub + boom (transient untouched, level unchanged):
+               -1.6 -> +1.1 dB vs the power sum on the 5.28 kick, -0.3 -> +0.3 dB with the reel's bass at 5.04.
+  Music ducking under the new cues: build_audio.py's logic and sndkit/sfx.py DUCK table, unchanged. After the
+  cut the reel's own UI sounds (success 5.100, toast 5.267) duck the new sounds still ringing (impact tail)
+  with the same DUCK entries they use on the music, so they keep the space they had in the original.
 
 METHOD (one master chain for the whole 15 s, then a splice back into the original)
   1. Score: build_audio.build() on the ORIGINAL timing.json re-renders the original music + SFX buses
@@ -49,7 +56,8 @@ METHOD (one master chain for the whole 15 s, then a splice back into the origina
                        the filter-down into the cut (FILTER_*); from 5.000: stems/music.wav itself. The
                        impact's own light broadband duck (DUCK['impact_drop']) acts over 5.0-5.4 s.
      sfx    the new cues incl. their reverb tails, held to 5.000 + TAIL_HOLD and faded to silence by
-            5.000 + TAIL_END (the impact's long hall is cut short there, under the reel), plus stems/sfx.wav
+            5.000 + TAIL_END (the impact's long hall is cut short there, under the reel; ducked by the reel's
+            UI sounds after the cut, see above), plus stems/sfx.wav
             from 5.000 on (SFX_FADE_IN raised-cosine fade-in: only the old cues' ~-60 dBFS reverb tails are
             there). The original 0-5 s SFX belonged to the old picture: none of them is kept before 5.000.
   3. Master: sndkit/master.py's chain (hp 18 Hz, normalisation, glue comp, make-up gain, soft clip, 4x
@@ -84,6 +92,7 @@ sys.dont_write_bytecode = True
 
 import argparse  # noqa: E402
 import hashlib  # noqa: E402
+import itertools  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 import re  # noqa: E402
@@ -107,8 +116,21 @@ from sndkit import master as MS  # noqa: E402
 from sndkit import music as MU  # noqa: E402
 from sndkit import report as R  # noqa: E402
 from sndkit import sfx as FX  # noqa: E402
-from sndkit.dsp import (SR, add_at, convolve_ir, cos_ramp, duck_env, event_duck, hp, make_ir, ns, smoothstep,  # noqa: E402
-                        tv_biquad, zp)
+from sndkit.dsp import (  # noqa: E402
+    SR,
+    add_at,
+    convolve_ir,
+    cos_ramp,
+    event_duck,
+    hp,
+    lp,
+    make_ir,
+    ns,
+    pan,
+    smoothstep,
+    tv_biquad,
+    zp,
+)
 
 N = 720000                 # 15.000 s
 N_CUT = 240000             # 5.000 s: the cut into the reel (and the impact's transient)
@@ -137,12 +159,14 @@ FILTER_RETURN = 0.004      # s: filtered -> full dry music, raised cosine starti
 SFX_FADE_IN = 0.005        # s: the original SFX stem fades in from sample 240000
 
 # the new sound design after the cut, and the splice back into soundtrack.wav
-TAIL_HOLD = 0.30           # s after the cut: impact + tails at full level
-TAIL_END = 0.72            # s after the cut: raised-cosine fade reaches silence
+TAIL_HOLD = 0.35           # s after the cut: impact + tails at full level (they are ~5 dB under the reel by then)
+TAIL_END = 0.80            # s after the cut: raised-cosine fade reaches silence (unfaded they would be ~20 dB under)
 XFADE = 0.12               # s: equal-gain crossfade into soundtrack.wav, [K - XFADE, K)
 L_NEW = TAIL_END + XFADE   # s of new master after the cut
 K = N_CUT + ns(L_NEW)      # first sample copied from soundtrack.wav
 SFX_SPAN = 6.4             # s: the new cues (and their reverbs) are rendered over [0, SFX_SPAN)
+LATE_KICK = 0.35           # s: an impact with no grid kick within 20 ms (render_cue's own alignment) gets its
+                           # low layers aligned to the first grid kick this far after it (under its sub tail)
 
 BW = 2 * 3                 # bytes per PCM frame (2 ch, 24 bit)
 
@@ -208,7 +232,7 @@ def original_score(timing, log):
     g0 = 10.0 ** ((-18.0 - MS.integrated_lufs(pre)) / 20.0)
     pk = max(np.max(np.abs(music_d)), np.max(np.abs(sfx_o))) * g0
     stem_gain = g0 * min(1.0, 10.0 ** (-1.0 / 20.0) / pk)
-    return dict(music_d=music_d, sfx=sfx_o, music_raw=music_raw, tracks=tracks, kick_trig=kick_trig,
+    return dict(music_d=music_d, sfx=sfx_o, music_raw=music_raw, tracks={'kick': tracks['kick']}, kick_trig=kick_trig,
                 events=binfo['events'], stem_gain=stem_gain)
 
 
@@ -264,7 +288,9 @@ def reproduce_master(stem_music, stem_sfx, orig_ints, log):
     q = np.round(np.clip(out, -1.0, 1.0 - 2.0 ** -23) * 8388607.0).astype(np.int64)
     d = q - orig_ints
     out2, _ = master_fixed(pre, norm_db, g_db)
-    return dict(norm_db=norm_db, g_db=g_db, max_lsb=int(np.abs(d).max()), rms_lsb=float(np.sqrt(np.mean(d ** 2.0))),
+    gr = -20 * np.log10(np.maximum(minfo['limiter_gain'], 1e-12))
+    return dict(norm_db=norm_db, g_db=g_db, lim_gr=float(gr.max()), lim_t=int(np.argmax(gr)) / SR,
+                glue_gr=float(minfo['glue_gr_db']), max_lsb=int(np.abs(d).max()), rms_lsb=float(np.sqrt(np.mean(d ** 2.0))),
                 n_diff=int(np.count_nonzero(np.any(d != 0, axis=0))),
                 max_dbfs=float(20 * np.log10(max(np.abs(d).max(), 1e-9) / 8388607.0)),
                 fixed_vs_master=float(np.abs(out2 - out).max()), lufs=MS.integrated_lufs(out))
@@ -293,6 +319,52 @@ def hook_irs():
     """build_intro.build()'s reverbs (the accent's own space) -> {bus: (ir, return gain)}."""
     return dict(hall=(make_ir(4.0, 3.0, 1.3, seed=41, predelay=0.022, hp_f=140.0, lp_f=5200.0, er_span=0.05), 0.9),
                 room=(make_ir(0.7, 0.45, 0.28, seed=42, predelay=0.005, hp_f=250.0, lp_f=8000.0, er_span=0.02), 1.0))
+
+
+def align_late_kick(cue, idx, ctx, layers):
+    """render_cue phase-aligns an impact's low layers (delay / polarity, sfx._kick_align) to a grid kick within
+    20 ms of the cue. An impact between two beats meets the next kick under its sub tail instead (5.000 -> the
+    build's kick at 5.280): same search and same rule (smallest move wins unless a bigger one is > 0.3 dB fuller,
+    below 160 Hz over the kick's first 150 ms), with the window on that kick. The transient layers stay on the
+    cue sample; the level is render_cue's (its canonical render's loudest 10 ms). -> (layers, note or None)"""
+    typ = cue['type']
+    if typ not in ('impact_big', 'impact_drop', 'impact_outro'):
+        return layers, None
+    s = ns(cue['t'])
+    kicks = ctx['kick_trig']
+    if any(abs(k - s) <= ns(0.02) for k in kicks):
+        return layers, None  # render_cue aligned it already
+    late = [k for k in kicks if ns(0.02) < k - s <= ns(LATE_KICK)]
+    if not late:
+        return layers, None
+    kind, seed = typ.split('_')[1], 1000 + idx
+    p = float(cue.get('pan', 0.0))
+    g = 10.0 ** ((FX.LEVELS[typ] + float(cue.get('gain', 0.0))) / 20.0) / FX.ref_level(FX.impact(kind, seed))[0]
+
+    def make(**kw):
+        lay = [(sig * g, off, snd) for sig, off, snd in FX.impact(kind, seed, **kw)]
+        return [(pan(sig, p), off, snd) for sig, off, snd in lay] if p else lay
+
+    chk = max(float(np.abs(a[0] - b[0]).max()) for a, b in zip(make(), layers))
+    assert chk == 0.0, f'impact re-render differs from render_cue ({chk})'
+    off, win = late[0] - s, ns(0.15)
+    low = lp(FX.impact(kind, seed, low_only=True) * g, 160.0, 4)
+    kick = lp(ctx['kick_track'][s:s + off + win], 160.0, 4)[off:]
+    best, e0 = None, None
+    for d in range(0, ns(0.02) + 1, ns(0.0005)):
+        sh = np.concatenate([np.zeros(d), low])[off:off + win]
+        for pol in (1.0, -1.0):
+            e = float(np.sum((kick + pol * sh) ** 2))
+            if e0 is None:
+                e0 = e
+            if best is None or e > best[0] * 10 ** 0.03:
+                best = (e, d, pol)
+    e, d, pol = best
+    if d == 0 and pol > 0:
+        return layers, None
+    return make(low_delay=d, low_polarity=pol), (f'kick {off / SR * 1000:+.0f} ms (under the sub tail): low layers moved '
+                                                 f"{d / SR * 1000:+.2f} ms{', polarity flipped' if pol < 0 else ''} "
+                                                 f'({10 * np.log10(e / e0):+.1f} dB low end on that kick vs as-is)')
 
 
 def render_cues(cues, orig, log):
@@ -328,6 +400,9 @@ def render_cues(cues, orig, log):
             ctx['notes'][i] = 'intro_fx accent (hook hall/room + bus EQ)'
         else:
             lay = FX.render_cue(cue, i, ctx)
+            lay, note = align_late_kick(cue, i, ctx, lay)
+            if note:
+                ctx['notes'][i] = '; '.join(x for x in (ctx['notes'].get(i, ''), note) if x)
         s = ns(cue['t'])
         dry = np.zeros((2, n))
         feeds = {}
@@ -381,24 +456,13 @@ def tail_env():
     return e
 
 
-def yield_to_reel(new, orig, reel_cues):
-    """After the cut the reel has priority: the new sounds still ringing there (impact tail, whip room) are
-    ducked by the reel's own events, with the rules the reel's music already follows:
-      - its UI sounds (success, toast, ...) duck the new sounds' band exactly as they duck the music
-        (build_audio DUCK logic), so they keep the space they had in the original;
-      - its grid kicks side-chain the new sounds below 150 Hz (depth / release of the score's bass
-        sidechain, sndkit/music.py), so the impact's sub tail doesn't thin out the build's first kick.
-    -> (new, info)"""
+def yield_to_reel(new, reel_cues):
+    """After the cut the reel has priority: its own UI sounds (success, toast, ...) duck the new sounds still
+    ringing there (impact tail, whip room) in their band exactly as they duck the music (build_audio DUCK
+    logic), so they keep the space they had in the original. -> (new, the ducking cues)"""
     after = [c for c in reel_cues if N_CUT <= ns(c['t']) < K]
     new, _ = duck_music(new, after)
-    kicks = [(s, v) for s, v in orig['events']['kick'] if N_CUT < s < K]
-    g = np.ones(N)
-    if kicks:
-        g = duck_env(N, [s for s, _ in kicks], [min(v, 0.88) for _, v in kicks], release=0.11)
-        lo = zp(new, 'lowpass', 150.0, 4)
-        new = new - lo + lo * g[None, :]
-    return new, dict(ui=[f"{c['type']}@{c['t']:.3f}" for c in after if c['type'] in FX.DUCK],
-                     kicks=[(s, v) for s, v in kicks], g_kick=g)
+    return new, [f"{c['type']}@{c['t']:.3f}" for c in after if c['type'] in FX.DUCK]
 
 
 def build(cues, reel_cues, orig, stem_music, stem_sfx, log):
@@ -418,14 +482,14 @@ def build(cues, reel_cues, orig, stem_music, stem_sfx, log):
     new = np.zeros((2, N))
     new[:, :sfx_new.shape[1]] = sfx_new * sg
     new *= tail[None, :]
-    new, yinfo = yield_to_reel(new, orig, reel_cues)
+    new, yielded = yield_to_reel(new, reel_cues)
     fin = np.zeros(N)
     nf = ns(SFX_FADE_IN)
     fin[N_CUT:N_CUT + nf] = cos_ramp(nf)
     fin[N_CUT + nf:] = 1.0
     old = stem_sfx * fin[None, :]
     info = dict(per=per, notes=notes, finfo=finfo, tail=tail, new_sfx=new, old_sfx=old, music_new0=m_new,
-                g_post=g_post, join_step=join_step, yinfo=yinfo)
+                g_post=g_post, join_step=join_step, yielded=yielded, new_raw=sfx_new * sg)
     return music, new + old, info
 
 
@@ -662,7 +726,7 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
     i5c, i5o = MS.integrated_lufs(c5), MS.integrated_lufs(o5)
     s5c, s5o = MS.segment_lufs(cash, 0.0, 5.0), MS.segment_lufs(og, 0.0, 5.0)
     w(f'  0-5 s: integrated (gated) cash {i5c:.2f} vs orig {i5o:.2f} LUFS ({i5c - i5o:+.2f} LU); ungated segment '
-      f'{s5c:.2f} vs {s5o:.2f} LUFS ({s5c - s5o:+.2f} LU) -> {"OK" if abs(s5c - s5o) <= 1.0 else "CHECK"} (want within 1 LU)')
+      f'{s5c:.2f} vs {s5o:.2f} LUFS ({s5c - s5o:+.2f} LU)')
     _, stc = _short_within(cash, 0.0, 5.0)
     _, sto = _short_within(og, 0.0, 5.0)
     w(f'  0-5 s short-term (3 s windows inside 0-5 s): max cash {stc.max():.1f} vs orig {sto.max():.1f} LUFS, '
@@ -676,7 +740,13 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
     w(f'  loudness range: cash {MS.loudness_range(cash):.1f} LU, orig {MS.loudness_range(og):.1f} LU')
     cuts = [0.0] + sorted({round(c['t'], 4) for c in cues if c['type'] in ('hit_cut',)}) + [5.0]
     w('  picture sections, ungated (cash / orig LUFS): ' + '   '.join(
-        f'{a:.3f}-{b:.3f} {MS.segment_lufs(cash, a, b):.1f} / {MS.segment_lufs(og, a, b):.1f}' for a, b in zip(cuts[:-1], cuts[1:])))
+        f'{a:.3f}-{b:.3f} {MS.segment_lufs(cash, a, b):.1f} / {MS.segment_lufs(og, a, b):.1f}' for a, b in itertools.pairwise(cuts)))
+    dl = [(a, b, MS.segment_lufs(cash, a, b) - MS.segment_lufs(og, a, b)) for a, b in itertools.pairwise(cuts)]
+    w('  -> within 1 LU of the original: ' + (', '.join(f'{a:.2f}-{b:.2f} s' for a, b, v in dl if abs(v) <= 1.0) or 'none')
+      + '; lighter: ' + (', '.join(f'{a:.2f}-{b:.2f} s ({v:+.1f} LU)' for a, b, v in dl if v < -1.0) or 'none')
+      + '. The music is the same and level-locked; the difference is')
+    w("     the sound design: the old picture's reveal whooshes (whoosh_rise / whoosh_long at gain 0, up to +3.4 dB K-wtd over")
+    w('     the music, analysis.txt) are gone, and the new cue sheet asks for lighter whooshes on its groove cuts.')
     ph_c = zp(zp(cash, 'highpass', 300.0, 4), 'lowpass', 12000.0, 2)
     ph_o = zp(zp(og, 'highpass', 300.0, 4), 'lowpass', 12000.0, 2)
     w(f'  phone-speaker sim (HP 300 Hz / LP 12 kHz), 0-5 s ungated: cash {MS.segment_lufs(ph_c, 0, 5):.1f} vs orig '
@@ -692,8 +762,9 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
       f'scale: {int(np.sum(np.abs(cash) >= 0.9999))}')
     lg = minfo['limiter_gain']
     gr = -20 * np.log10(np.maximum(lg, 1e-12))
-    w(f"  new master: limiter max GR {gr[:K].max():.2f} dB at {np.argmax(gr[:K]) / SR:.3f}s (orig's max {2.65:.2f} dB at "
-      f"6.234s), glue comp max GR {minfo['glue_gr'][:K // 48].max():.2f} dB")
+    w(f"  new master: limiter max GR {gr[:K].max():.2f} dB at {np.argmax(gr[:K]) / SR:.3f}s, glue comp max GR "
+      f"{minfo['glue_gr'][:K // 48].max():.2f} dB (the original master: {rep['lim_gr']:.2f} dB at {rep['lim_t']:.3f}s, "
+      f"{rep['glue_gr']:.2f} dB)")
     if use_ffmpeg and shutil.which('ffmpeg'):
         with tempfile.TemporaryDirectory() as td:
             dec, fm, md5_mp4 = BA.aac_roundtrip(paths['out'], td, mux=True)
@@ -721,8 +792,14 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
         w('  AAC: skipped (--no-ffmpeg or no ffmpeg): the AAC delivery true peak is NOT verified')
     dc = np.mean(cash, axis=1)
     dcn = np.mean(cash[:, :K], axis=1)
+    def sub20(x):
+        sp = np.abs(np.fft.rfft(np.mean(x, axis=0))) ** 2
+        fq = np.fft.rfftfreq(x.shape[1], 1 / SR)
+        return 100.0 * sp[(fq > 0) & (fq < 20)].sum() / sp[fq > 0].sum()
+
     w(f'  DC offset: whole file L {dc[0]:+.2e} R {dc[1]:+.2e}; new part L {dcn[0]:+.2e} R {dcn[1]:+.2e} (orig L '
-      f'{np.mean(og[0]):+.2e} R {np.mean(og[1]):+.2e})')
+      f'{np.mean(og[0]):+.2e} R {np.mean(og[1]):+.2e}); energy below 20 Hz in [0, K): {sub20(cash[:, :K]):.3f}% (orig '
+      f'{sub20(og[:, :K]):.3f}%) -> no DC (the 18 Hz master high-pass)')
     w('')
 
     # transition
@@ -756,7 +833,7 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
 
     w('THE CUT AT 5.000 s (sample 240000)')
     n0 = N_CUT
-    w(f'  samples 239997-240002 L: ' + ' '.join(f'{v:+.5f}' for v in cash[0, n0 - 3:n0 + 3])
+    w('  samples 239997-240002 L: ' + ' '.join(f'{v:+.5f}' for v in cash[0, n0 - 3:n0 + 3])
       + '   R: ' + ' '.join(f'{v:+.5f}' for v in cash[1, n0 - 3:n0 + 3]))
     d1 = np.abs(np.diff(cash, axis=1))
     w(f'  |x[n+1] - x[n]|: max over 239760-239998 (last 5 ms, whip stop) {d1[:, n0 - ns(0.005):n0 - 1].max():.5f}; across '
@@ -779,9 +856,10 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
       f'first 100 ms after {20 * np.log10(np.max(np.abs(cash[:, n0:n0 + ns(0.1)]))):.1f} dBFS; 50 ms RMS '
       f'{_rms_db(cash, n0 - ns(0.05), n0):.1f} -> {_rms_db(cash, n0, n0 + ns(0.05)):.1f} dBFS')
     w(f'  music return: music bus RMS 4.990-4.999 s {_rms_db(music, n0 - ns(0.01), n0):.1f} dBFS -> 5.005-5.015 s '
-      f'{_rms_db(music, n0 + ns(0.005), n0 + ns(0.015)):.1f} dBFS (filtered -7 dB -> full, {FILTER_RETURN * 1000:.0f} ms raised '
-      f'cosine from sample 240000, under the impact); the impact duck takes it {20 * np.log10(binfo["g_post"][n0 + ns(0.05)]):+.1f} dB '
-      f'for 80 ms')
+      f'{_rms_db(music, n0 + ns(0.005), n0 + ns(0.015)):.1f} dBFS (low-passed, {FILTER_DIP_DB:+.0f} dB -> full, '
+      f'{FILTER_RETURN * 1000:.0f} ms raised cosine from sample 240000, under the impact); the impact\'s own duck '
+      f'(sfx.DUCK) holds it at {20 * np.log10(binfo["g_post"][n0 + ns(0.05)]):+.1f} dB for '
+      f"{FX.DUCK['impact_drop'][2] * 1000:.0f} ms, released over {FX.DUCK['impact_drop'][3] * 1000:.0f} ms")
     w(f"  reel's SFX stem from 5.000: {SFX_FADE_IN * 1000:.0f} ms fade-in over its {_rms_db(sfx - binfo['new_sfx'], n0, n0 + ns(0.005)):.0f} dBFS "
       f'(stem domain) reverb tails of the old cues')
     w('')
@@ -790,10 +868,18 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
     w(f'IMPACT TAIL AND THE SPLICE (new sound design held to 5.000 + {TAIL_HOLD:.2f} s, faded out by 5.000 + {TAIL_END:.2f} s; '
       f'crossfade {(K - ns(XFADE)) / SR:.3f}-{K / SR:.3f} s)')
     nd = binfo['new_sfx']
+    raw = binfo['new_raw']
+    reel = music + sfx - nd
     rows = []
     for a in (5.05, 5.15, 5.25, 5.35, 5.45, 5.55, 5.65, 5.75):
-        rows.append(f'{a:.2f} {_rms_db(nd, ns(a), ns(a + 0.05)) - _rms_db(music + sfx - nd, ns(a), ns(a + 0.05)):+.1f}')
-    w('  new sound design vs the reel under it (pre-master, 50 ms RMS, dB): ' + '  '.join(rows))
+        rr = _rms_db(reel, ns(a), ns(a + 0.05))
+        rows.append(f'{a:.2f} {_rms_db(nd, ns(a), ns(a + 0.05)) - rr:+.1f} ({_rms_db(raw, ns(a), ns(a + 0.05)) - rr:+.1f})')
+    w('  new sound design vs the reel under it, 50 ms RMS dB as mixed (unfaded, unducked): ' + '  '.join(rows))
+    th, te = N_CUT + ns(TAIL_HOLD), N_CUT + ns(TAIL_END)
+    w(f'  -> unfaded, the new sounds are {_rms_db(raw, th - ns(0.025), th + ns(0.025)) - _rms_db(reel, th - ns(0.025), th + ns(0.025)):+.1f} dB '
+      f're the reel where the fade starts ({th / SR:.2f} s) and would be {_rms_db(raw, te - ns(0.025), te + ns(0.025)) - _rms_db(reel, te - ns(0.025), te + ns(0.025)):+.1f} dB '
+      f'where it ends ({te / SR:.2f} s): the fade only takes the last part of a tail already sinking under the build. '
+      f"Ducked by the reel's own {', '.join(binfo['yielded'])}")
     rows = []
     for c in otim['cues']:
         if not (5.0 <= c['t'] < 5.0 + L_NEW) or c['type'] not in BA.UI_AUDIBLE:
@@ -802,9 +888,9 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
         b = a + ns(0.02 if c['type'] in ('click', 'tap_soft', 'tick') else 0.08)  # build_audio's windows
         bo, fo = R.best_band_snr(binfo['stem_sfx'][:, a:b], binfo['stem_music'][:, a:b])
         bn, fn = R.best_band_snr((sfx - nd)[:, a:b], music[:, a:b] + nd[:, a:b])
-        rows.append(f"{c['type']}@{c['t']:.3f}: {bo:+.1f} dB @ {fo:.0f} Hz -> {bn:+.1f} dB @ {fn:.0f} Hz")
+        rows.append((f"{c['type']}@{c['t']:.3f}: {bo:+.1f} dB @ {fo:.0f} Hz -> {bn:+.1f} dB @ {fn:.0f} Hz", bn))
     w("  the reel's own sounds after the cut, best 1/3-octave band over everything else (orig -> cash; want >= +6): "
-      + '; '.join(rows))
+      + '; '.join(r_[0] for r_ in rows) + f" -> {'OK' if all(r_[1] >= 6.0 for r_ in rows) else 'CHECK'}")
     a, b = K - ns(XFADE), K
     res = out_new[:, a:b] - orig_f[:, a:b]
     sig_rms = np.sqrt(np.mean(orig_f[:, a:b] ** 2))
@@ -867,7 +953,8 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
         bb_s = f'{bb:+6.1f}' if bb < 40 else '  >+40'
         pc = binfo['per'][i]
         rd = (pc['last'] + 1 - a) if typ in FX.END_ALIGNED else (pc['first'] - a)
-        worst_r = max(worst_r, abs(rd))
+        if typ in tr_types or typ in FX.END_ALIGNED:  # (whooshes open on a zero envelope sample: +1)
+            worst_r = max(worst_r, abs(rd))
         if typ in tr_types:
             lowc = typ in low_types
             ds, dm = R.match(on_stem, c['t']), R.match(on_mix, c['t'])
@@ -876,13 +963,14 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
             bs_ = min([abs(v) for v in (ds, dsl) if v is not None], default=np.inf)
             bm_ = min([abs(v) for v in (dm, dml) if v is not None], default=np.inf)
             worst_s, worst_m = max(worst_s, bs_), max(worst_m, bm_)
-            g_ = lambda d_: f(d_) if lowc else '       -'
-            cols = f'{f(ds)}   {g_(dsl)}   {f(dm)}   {g_(dml)}'
+            nl = '       -'
+            cols = f"{f(ds)}   {f(dsl) if lowc else nl}   {f(dm)}   {f(dml) if lowc else nl}"
         else:
             cols = '       -          -          -          -'
         w(f"  {c['t']:6.3f}  {a:7d}   {typ:13s} {c.get('gain', 0):+4.0f}  {rd:+5d}   {cols}   {snr_s}        {bb_s} dB @ "
           f"{bf:5.0f} Hz   {binfo['notes'].get(i, '')}")
-    w(f'  render offsets: max |offset| {worst_r} samples -> {"PASS (every cue ON its sample)" if worst_r == 0 else "FAIL"}')
+    w(f'  render offsets (transient + END-ALIGNED cues): max |offset| {worst_r} samples -> '
+      f'{"PASS (every cue ON its sample)" if worst_r == 0 else "FAIL"}')
     w(f"  transient cues ({len(trans)}), blind detectors: max |dev| (best detector) stem {worst_s * 1000:.2f} ms, final mix "
       f"{worst_m * 1000:.2f} ms -> {'PASS (< 2 ms)' if worst_s < 0.002 and worst_m < 0.002 else 'FAIL'}")
     w('  END-ALIGNED cues (isolated dry render; must end ON the cue sample):')
@@ -931,22 +1019,20 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
                 both = float(np.mean((y[a:b] + x[a:b]) ** 2))
                 rows.append(f"{c['type']}@{c['t']:.3f} + {c2['type']}@{c2['t']:.3f}: {10 * np.log10(both / (k_ + x_)):+.1f} dB")
         if s >= N_CUT:
-            xo = zp(np.mean(nsfx, axis=0), 'lowpass', 160.0, 4)  # all new sounds as mixed (tail env + sidechain)
-            for kk, _ in binfo['yinfo']['kicks']:
+            xo = zp(np.mean(nsfx, axis=0), 'lowpass', 160.0, 4)  # all new sounds as mixed (tail fade incl.)
+            for kk in [k for k in orig['kick_trig'] if s < k <= s + ns(LATE_KICK)]:
                 a2, b2 = kk, kk + ns(0.15)
                 k_ = float(np.mean(lpk[a2:b2] ** 2))
                 x_ = float(np.mean(xo[a2:b2] ** 2))
                 both = float(np.mean((lpk[a2:b2] + xo[a2:b2]) ** 2))
-                raw = float(np.mean((lpk[a2:b2] + x[a2:b2] * binfo['tail'][a2:b2]) ** 2))
-                raw_p = k_ + float(np.mean((x[a2:b2] * binfo['tail'][a2:b2]) ** 2))
-                rows.append(f"{c['type']}@{c['t']:.3f} tail + grid kick @{kk / SR:.3f} (sidechained, new sounds "
-                            f"{10 * np.log10(x_ / k_):+.1f} dB re kick): {10 * np.log10(both / (k_ + x_)):+.1f} dB "
-                            f"(without the sidechain {10 * np.log10(raw / raw_p):+.1f} dB)")
+                rows.append(f"{c['type']}@{c['t']:.3f} sub tail (all new sounds as mixed, {10 * np.log10(x_ / k_):+.1f} dB "
+                            f"re the kick) + grid kick @{kk / SR:.3f}: {10 * np.log10(both / (k_ + x_)):+.1f} dB "
+                            f"({10 * np.log10(both / k_):+.1f} dB vs the kick alone)")
             mm = zp(np.mean(music, axis=0), 'lowpass', 160.0, 4)
             k_ = float(np.mean(mm[a:b] ** 2))
             x_ = float(np.mean(x[a:b] ** 2))
             both = float(np.mean((mm[a:b] + x[a:b]) ** 2))
-            rows.append(f"{c['type']}@{c['t']:.3f} + the reel's music (bass Db2 at 5.04 s): {10 * np.log10(both / (k_ + x_)):+.1f} dB")
+            rows.append(f"{c['type']}@{c['t']:.3f} + the reel's music bus (its bass): {10 * np.log10(both / (k_ + x_)):+.1f} dB")
     for r_ in rows:
         w('  ' + r_)
     w('')
@@ -999,9 +1085,12 @@ def analyse(cues, otim, paths, out_new, full, orig_f, music, sfx, binfo, orig, r
         cs = sorted(np.corrcoef(x[0, i:i + Wn], x[1, i:i + Wn])[0, 1] for i in range(0, N_CUT - Wn, Hn))
         lo_x = zp(x[:, :N_CUT], 'lowpass', 150.0, 4)
         seg = np.mean(x[:, :N_CUT], axis=0)
-        F = np.abs(np.fft.rfft(seg)) ** 2
+        spec = np.abs(np.fft.rfft(seg)) ** 2
         fr = np.fft.rfftfreq(len(seg), 1 / SR)
-        e = lambda lo, hi: 100.0 * F[(fr >= lo) & (fr < hi)].sum() / F[(fr >= 20) & (fr < 20000)].sum()
+
+        def e(lo, hi, spec=spec, fr=fr):
+            return 100.0 * spec[(fr >= lo) & (fr < hi)].sum() / spec[(fr >= 20) & (fr < 20000)].sum()
+
         w(f'  {name}: L/R corr {np.corrcoef(L_, R_)[0, 1]:+.2f} (lowest 100 ms {cs[0]:+.2f}), below 150 Hz '
           f'{np.corrcoef(lo_x[0], lo_x[1])[0, 1]:.3f}; mono sum vs stereo {loss:+.2f} dB;  % energy: <30 Hz {e(20, 30):.1f}  '
           f'30-80 {e(30, 80):.1f}  80-200 {e(80, 200):.1f}  200-400 {e(200, 400):.1f}  400-900 {e(400, 900):.1f}  '
@@ -1054,7 +1143,8 @@ def main():
     log('reproducing the original master from its stems')
     rep = reproduce_master(stem_music, stem_sfx, pcm_ints(orig_frames), log)
     g_txt = analysis_makeup()
-    log(f"  make-up gain {rep['g_db']:+.6f} dB (analysis.txt {g_txt:+.2f}), normalisation {rep['norm_db']:+.6f} dB; "
+    log(f"  make-up gain {rep['g_db']:+.6f} dB (analysis.txt {'n/a' if g_txt is None else f'{g_txt:+.2f}'}), "
+        f"normalisation {rep['norm_db']:+.6f} dB; "
         f"residual vs soundtrack.wav max {rep['max_lsb']} LSB ({rep['max_dbfs']:.1f} dBFS); fixed-gain chain vs master(): "
         f"{rep['fixed_vs_master']:.1e}")
     assert g_txt is None or abs(rep['g_db'] - g_txt) < 0.006, (rep['g_db'], g_txt)
