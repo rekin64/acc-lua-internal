@@ -72,7 +72,7 @@ def blend(k):
         acc = lin if acc is None else acc + lin
         n += 1
     if n == 0:
-        raise SystemExit(f'missing frame {k}')
+        raise RuntimeError(f'missing frame {k}')  # RuntimeError propagates out of the pool (SystemExit would hang it)
     out = to_srgb(acc / n).astype(np.float32) * 255.0
     out += np.random.default_rng(k).triangular(-0.75, 0, 0.75, size=out.shape).astype(np.float32)
     return np.clip(np.rint(out), 0, 255).astype(np.uint8).tobytes()
