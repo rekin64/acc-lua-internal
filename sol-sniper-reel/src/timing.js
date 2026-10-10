@@ -42,40 +42,43 @@ export const MUSIC = {
 const s = snap;
 // Sound-design cues, aligned to the cut frames used by the timeline.
 // gain is in dB relative to the type's default level; pan -1..1; dur in seconds where relevant.
+// riser / reverse_swell / whip END at t; whooshes start at t.
 export const CUES = [
   // 1 · Title
   { t: s(0.0),  type: 'impact_big' },
   { t: s(0.0),  type: 'text_reveal', gain: -4 },
-  { t: s(beat(2)), type: 'tick', gain: -6 },               // "REDEFINED." accent
-  { t: s(1.30), type: 'whoosh_fast', gain: -3 },           // title exits
+  { t: s(beat(2)), type: 'tick', gain: -6 },                // "REDEFINED." turns brand
+  { t: s(1.2),  type: 'whoosh_fast', gain: -5 },            // title masks out
   // 2 · Site reveal
-  { t: s(beat(3)), type: 'whoosh_rise' },                  // site card rises in
+  { t: s(beat(3)), type: 'whoosh_rise' },                   // cut to light + site card rises
   { t: s(beat(3)), type: 'hit_cut', gain: -6 },
-  { t: s(beat(4)), type: 'whoosh_long', dur: 0.48 },       // push to the logo
-  { t: s(beat(4.5)), type: 'text_reveal', gain: -8 },      // "Built for speed."
-  { t: s(beat(6.5)), type: 'whoosh_long', dur: 0.34, pan: 0.2 }, // glide down to headline
-  { t: s(beat(7.6)), type: 'tap_soft', gain: -6 },         // cursor hover on CTA
-  { t: s(beat(8)), type: 'click' },                        // click "Start Sniping"
-  { t: s(beat(8)), type: 'zoom_through', dur: +(s(4.0) - s(beat(8))).toFixed(4) }, // thump lands on the cut into the app (4.00)
+  { t: s(beat(3.75)), type: 'whoosh_long', dur: 0.6 },      // push to the logo
+  { t: s(beat(4)), type: 'text_reveal', gain: -8 },         // "Built for speed."
+  { t: s(beat(5.75)), type: 'whoosh_long', dur: 0.48, pan: 0.2 }, // glide down to the hero
+  { t: s(beat(7.6)), type: 'tap_soft', gain: -6 },          // cursor hover on CTA
+  { t: s(beat(8)), type: 'click' },                         // click "Start Sniping"
+  { t: s(beat(8)), type: 'zoom_through', dur: +(s(4.0) - s(beat(8))).toFixed(4) }, // thump on the cut into the app (4.00)
   // 3 · Demo
-  { t: s(beat(9)),  type: 'ui_blip' },                     // Spot. new pair detected
-  { t: s(beat(10)), type: 'click' },                       // Snipe.
-  { t: s(beat(10.6)), type: 'success', gain: -3 },         // filled
-  { t: s(beat(11)), type: 'toast' },                       // React.
-  { t: s(beat(13)), type: 'riser', dur: 0.96 },            // build into the drop
+  { t: s(beat(9)),  type: 'ui_blip' },                      // Spot. new pair detected
+  { t: s(beat(9) + 0.12), type: 'whoosh_fast', gain: -12, pan: 0.2 }, // punch onto AI 94
+  { t: s(beat(10)), type: 'click' },                        // Snipe.
+  { t: s(beat(10.6)), type: 'success', gain: -3 },          // filled
+  { t: s(beat(11)), type: 'toast' },                        // React.
+  { t: s(beat(13)), type: 'riser', dur: 0.96 },             // build into the drop
   { t: s(beat(13)), type: 'reverse_swell', dur: 0.6 },
   // 4 · Drop
+  { t: s(beat(13)), type: 'whip', dur: +(s(beat(13)) - s(beat(12.72))).toFixed(4), pan: 0.3 }, // whip lands ON the drop
   { t: s(beat(13)), type: 'impact_drop' },
-  { t: s(beat(13)), type: 'whoosh_fast', pan: 0.3 },       // whip to chart
-  { t: s(beat(14)), type: 'hit_cut', gain: -5 },              // hard cut to trade panel
-  { t: s(beat(14)), type: 'whoosh_fast', pan: -0.3, gain: -6 },
-  { t: s(beat(14.5)), type: 'click', gain: -3 },           // preset 0.5 SOL
-  { t: s(beat(15)), type: 'click' },                       // Buy
-  { t: s(beat(15.5)), type: 'success' },                   // filled
+  { t: s(beat(14)), type: 'hit_cut', gain: -5 },            // hard cut to trade panel
+  { t: s(beat(14)), type: 'whoosh_fast', pan: -0.3, gain: -8 },
+  { t: s(beat(14.5)), type: 'click', gain: -3 },            // preset 0.5 SOL
+  { t: s(beat(15)), type: 'click' },                        // Buy
+  { t: s(beat(15.5)), type: 'success' },                    // filled
   { t: s(beat(15.6)), type: 'toast', gain: -3 },
   { t: s(beat(16)), type: 'whoosh_long', dur: 0.3, pan: 0.2 }, // pan to positions
-  { t: s(beat(17)), type: 'tick', gain: -4 },
-  { t: s(beat(18)), type: 'success', gain: -4 },           // take-profit hit
+  { t: s(beat(17)), type: 'tick', gain: -4 },               // GLINT position ticks
+  { t: s(beat(18)), type: 'success', gain: -4 },            // take-profit hit
+  { t: s(beat(18)), type: 'punch', gain: -6 },
   { t: s(beat(19)), type: 'whoosh_long', dur: 0.46, gain: -2 }, // pull out to full app
   // 5 · Montage
   { t: s(beat(20)), type: 'hit_cut' },
@@ -95,24 +98,33 @@ export const CUES = [
   { t: s(beat(26)), type: 'reverse_swell', dur: 0.48 },
   // 6 · Outro
   { t: s(beat(26)), type: 'impact_outro' },
-  { t: s(beat(28)), type: 'whoosh_rise', gain: -8 },       // CTA button reveal
-  { t: s(beat(29.6)), type: 'tap_soft', gain: -8 },        // cursor hover
-  { t: s(beat(30)), type: 'click' },                       // final click
+  { t: s(beat(27.2)), type: 'text_reveal', gain: -8 },      // headline returns
+  { t: s(beat(28.25)), type: 'whoosh_rise', gain: -8 },     // CTA springs in
+  { t: s(beat(29.6)), type: 'tap_soft', gain: -8 },         // cursor hover
+  { t: s(beat(30)), type: 'click_final' },                  // final click + payoff
 ];
 
 // Fast camera moves get extra motion-blur sub-frames (smooth streaks instead of
-// stepped copies). Everything else uses the renderer's default sample count.
+// stepped copies): [start, end, samples]. Everything else uses the default count.
 export const FAST_MOTION = [
-  [1.15, 1.80],   // title exit + site card rise
-  [1.93, 2.42],   // push to the logo
-  [3.10, 3.50],   // glide down to the hero
-  [3.83, 4.20],   // zoom-through the CTA and landing in the app
-  [6.00, 6.45],   // whip pan to the chart (on the drop)
-  [7.64, 8.00],   // pan to positions
-  [9.10, 9.50],   // pull-out to the full terminal
-  [12.30, 12.50], // push into the outro match-cut
+  [1.43, 1.95, 24],   // card rise
+  [1.80, 2.42, 48],   // push to the logo
+  [2.76, 3.26, 32],   // glide down to the hero
+  [3.83, 4.12, 48],   // zoom-through the CTA and landing in the app
+  [4.44, 4.77, 24],   // punch onto AI 94
+  [5.10, 5.60, 16],   // breathe out for the notification
+  [6.10, 6.30, 48],   // whip pan landing on the drop
+  [6.73, 7.20, 24],   // cursor-follow punch-ins (trade panel)
+  [7.40, 7.98, 24],   // breathe out + pan to positions
+  [8.10, 8.70, 24],   // punch to GLINT / FROGO rows
+  [9.10, 9.60, 32],   // pull-out to the full terminal
+  [12.30, 12.50, 32], // push into the outro match-cut
+  [12.86, 13.40, 24], // logo glides up into the end card
+  [14.40, 15.0, 16],  // cursor drifts off
 ];
-export const samplesFor = (frame, base = 4, fast = 12) => {
+export const samplesFor = (frame, base = 4, fastMax = 48) => {
   const t = frame / FPS;
-  return FAST_MOTION.some(([a, b]) => t >= a && t < b) ? fast : base;
+  let n = base;
+  for (const [a, b, k] of FAST_MOTION) if (t >= a && t < b) n = Math.max(n, Math.min(k, fastMax));
+  return n;
 };

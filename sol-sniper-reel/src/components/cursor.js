@@ -16,15 +16,19 @@ export function createCursor({ size = 26 } = {}) {
   const arrow = el.querySelector('.cursor-arrow');
   return {
     el,
-    /** state: { x, y, opacity=1, press=0 (0..1), ring=-1 (0..1 progress of click ring, <0 hidden) } */
-    update({ x = 0, y = 0, opacity = 1, press = 0, ring: rp = -1 }) {
+    /** state: { x, y, opacity=1, press=0 (0..1), ring=-1 (0..1 progress of click ring, <0 hidden),
+     *  ringScale=1 (world-space size factor, e.g. 2/zoom keeps it modest in punch-ins),
+     *  ringLight=false (white ring for clicks on gradient buttons) } */
+    update({ x = 0, y = 0, opacity = 1, press = 0, ring: rp = -1, ringScale = 1, ringLight = false }) {
       css(el, 'transform', `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)`);
       css(el, 'opacity', opacity.toFixed(3));
       css(arrow, 'transform', `scale(${(1 - 0.12 * press).toFixed(3)})`);
       if (rp >= 0 && rp <= 1) {
-        const r = lerp(6, 30, ease.outCubic(rp));
-        css(ring, 'opacity', (0.55 * (1 - ease.inQuad(rp))).toFixed(3));
+        const r = lerp(6, 30, ease.outCubic(rp)) * ringScale;
+        css(ring, 'opacity', ((ringLight ? 0.8 : 0.55) * (1 - ease.inQuad(rp))).toFixed(3));
         css(ring, 'transform', `translate(-50%, -50%) scale(${(r / 20).toFixed(3)})`);
+        css(ring, 'borderColor', ringLight ? 'rgba(255,255,255,0.85)' : '#6E5DBE');
+        css(ring, 'background', ringLight ? 'rgba(255,255,255,0.10)' : 'rgba(110,93,190,0.10)');
       } else css(ring, 'opacity', '0');
     },
   };

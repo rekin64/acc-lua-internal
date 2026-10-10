@@ -24,9 +24,13 @@ html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
 .title .in { display: inline-block; font-family: var(--font-ui); font-weight: 800; font-size: 138px; line-height: 0.96;
   letter-spacing: -0.048em; color: #FFFFFF; text-transform: uppercase; white-space: nowrap; }
 .title .grad { position: relative; }
-.title .grad .paint { position: absolute; left: 0; top: 0; color: transparent;
+.title .grad .paint { position: absolute; left: 0; top: 0; color: transparent; --p: -5%;
   background: linear-gradient(90deg, #8DA0F4 0%, #A58BEF 55%, #C18AEC 100%);
-  -webkit-background-clip: text; background-clip: text; clip-path: inset(0 100% 0 0); }
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 calc(var(--p) - 12%), transparent var(--p));
+  mask-image: linear-gradient(90deg, #000 0%, #000 calc(var(--p) - 12%), transparent var(--p)); }
+/* the live terminal behind the title: dark, defocused, never competing with the type */
+.ghost-ui { position: absolute; inset: 0; overflow: hidden; opacity: 0; filter: blur(9px) brightness(0.26) saturate(0.8); }
 
 /* ---------- Supers (lower-third typography) ---------- */
 .super { position: absolute; left: 96px; width: 900px; z-index: 40; font-family: var(--font-ui); font-weight: 600; font-size: 78px; line-height: 1.06; letter-spacing: -0.038em; }
@@ -37,14 +41,17 @@ html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
 .super--light .wi { color: #FFFFFF; }
 .super--light .dot { color: #B49BF2; }
 .scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 900px; z-index: 30; pointer-events: none; opacity: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.82) 26%, #FFFFFF 44%, #FFFFFF 100%); }
+  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 13%, #FFFFFF 20%, #FFFFFF 100%); }
+/* montage: a clean strip behind the simulated label so it never sits on UI text */
+.chip-band { position: absolute; left: 0; right: 0; top: 1360px; bottom: 0; z-index: 44; pointer-events: none; opacity: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0) 0px, rgba(255,255,255,0.94) 48px, #FFFFFF 70px, #FFFFFF 100%); }
 
 /* Small persistent label during simulated trade footage */
-.sim-chip { position: absolute; left: 96px; top: 1436px; z-index: 45; display: inline-flex; align-items: center; gap: 12px;
-  padding: 12px 20px 12px 16px; border-radius: 999px; background: rgba(255,255,255,0.92);
+.sim-chip { position: absolute; left: 96px; top: 1428px; z-index: 45; display: inline-flex; align-items: center; gap: 14px;
+  padding: 15px 26px 15px 20px; border-radius: 999px; background: rgba(255,255,255,0.96);
   box-shadow: 0 0 0 1px rgba(20, 22, 40, 0.08), 0 8px 24px rgba(20, 22, 40, 0.10);
-  font: 600 22px/1 var(--font-ui); letter-spacing: 0.06em; color: #4B4C57; text-transform: uppercase; opacity: 0; }
-.sim-chip i { width: 10px; height: 10px; border-radius: 50%; background: #E8A317; box-shadow: 0 0 0 4px rgba(232,163,23,0.18); }
+  font: 600 29px/1 var(--font-ui); letter-spacing: 0.05em; color: #3E3F4A; text-transform: uppercase; opacity: 0; }
+.sim-chip i { width: 13px; height: 13px; border-radius: 50%; background: #E8A317; box-shadow: 0 0 0 5px rgba(232,163,23,0.2); }
 
 /* Floating notification card (stage space, layered above the UI for depth) */
 .ntoast { position: absolute; z-index: 35; left: 96px; width: 888px; box-sizing: border-box; display: flex; align-items: center; gap: 26px;
@@ -55,15 +62,24 @@ html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
 .ntoast .tx { flex: 1; min-width: 0; }
 .ntoast .t1 { font-weight: 600; font-size: 34px; letter-spacing: -0.02em; color: #111217; line-height: 1.15; }
 .ntoast .t2 { margin-top: 6px; font-weight: 500; font-size: 26px; letter-spacing: -0.01em; color: #6B6C78; font-feature-settings: 'tnum'; }
-.ntoast .tag { flex: none; align-self: flex-start; font: 600 18px/1 var(--font-ui); letter-spacing: 0.07em; text-transform: uppercase;
+.ntoast .tag { flex: none; align-self: flex-start; font: 600 22px/1 var(--font-ui); letter-spacing: 0.07em; text-transform: uppercase;
   color: #8A6A12; background: #FBF3DC; padding: 9px 12px; border-radius: 10px; }
 
 /* ---------- 6 · Outro ---------- */
 .outro-bg { position: absolute; inset: 0; background: #FFFFFF; }
 .outro-center { position: absolute; left: 0; right: 0; display: flex; justify-content: center; }
-.outro-cta { position: relative; display: inline-flex; align-items: center; justify-content: center; height: 140px; padding: 0 84px;
-  border-radius: 999px; background: var(--ss-grad-btn); color: #FFFFFF; font: 600 54px/1 var(--font-site); letter-spacing: -0.01em;
-  box-shadow: 0 18px 40px rgba(90, 86, 189, 0.30), 0 4px 10px rgba(90, 86, 189, 0.18), inset 0 1px 0 rgba(255,255,255,0.18); }
+.outro-h1 { position: absolute; left: 0; right: 0; text-align: center; }
+.outro-h1 .ln { display: block; overflow: hidden; padding: 0.02em 0 0.1em; margin: -0.02em 0 -0.1em; }
+.outro-h1 .in { display: inline-block; font: 700 118px/0.98 var(--font-site); letter-spacing: -0.02em; color: transparent;
+  background: var(--ss-grad-head); background-size: 100% 300%; background-position: 0 var(--bp);
+  -webkit-background-clip: text; background-clip: text; padding-bottom: 0.08em; }
+/* the site's own CTA button, scaled up */
+.outro-cta { position: relative; display: inline-flex; align-items: center; justify-content: center; height: 132px; padding: 0 70px;
+  border-radius: 999px; color: #FFFFFF; font: 500 50px/1 var(--font-site); letter-spacing: -0.005em;
+  background: linear-gradient(180deg, #2B4FA1 0%, #4159AD 15%, #7A66C8 55%, #AC6ADF 97%, #B06BE0 100%);
+  box-shadow: 0 18px 40px rgba(90, 86, 189, 0.28), 0 4px 10px rgba(90, 86, 189, 0.16); }
+.outro-cta .lbl { position: relative; z-index: 1; }
 .outro-cta .hl { position: absolute; inset: 0; border-radius: inherit; background: #FFFFFF; opacity: 0; mix-blend-mode: soft-light; }
-.disclaimer { position: absolute; left: 120px; right: 120px; text-align: center; font: 500 23px/1.45 var(--font-ui);
-  color: #8C8D98; letter-spacing: -0.005em; opacity: 0; }
+.outro-ping { position: absolute; inset: -4px; border-radius: inherit; border: 3px solid #8E7FE6; opacity: 0; pointer-events: none; }
+.disclaimer { position: absolute; left: 100px; right: 100px; text-align: center; font: 500 29px/1.42 var(--font-ui);
+  color: #5A5B67; letter-spacing: -0.005em; opacity: 0; }

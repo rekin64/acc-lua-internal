@@ -16,7 +16,7 @@ const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : def; };
 const WORKERS = Number(opt('workers', Math.max(1, Math.min(6, os.cpus().length))));
 const SAMPLES = Number(opt('samples', 4));
-const FAST_SAMPLES = Number(opt('fast-samples', 12)); // used inside timing.js FAST_MOTION windows
+const FAST_SAMPLES = Number(opt('fast-samples', 48)); // cap for timing.js FAST_MOTION windows
 const SHUTTER = Number(opt('shutter', 0.5)); // fraction of the frame interval the shutter is open
 const TOTAL = Math.round(DURATION * FPS);
 const FROM = Number(opt('from', 0));
