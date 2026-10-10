@@ -265,7 +265,7 @@ export function buildReel(stage) {
     K(WHIP0, rowCamFeed(2.56), ease.linear),                  // hold through the pre-drop gap
     K(WHIP1, chartCam(1.42, 0.5), ease.inOutExpo),            // whip lands ON the drop: launch -> entry -> climb
     K(B(13) + 0.1, chartCam(1.44, 0.5), ease.outSine),
-    K(B(14), pnlCam(1.72), ease.inOutSine),                   // drift toward the Sim PnL chip
+    K(B(14), chartCam(1.6, 0.58), ease.inOutSine),            // gentle push toward the Sim PnL chip
     K(B(14), tradeCam(1.62)),                                 // hard cut: trade panel
     K(B(14.5) - 0.12, elCam('trade.preset.1', 2.35, 760), ease.glide), // cursor-follow punch-in
     K(B(15) - 0.08, elCam('trade.buy', 2.15, 900), ease.easy),
