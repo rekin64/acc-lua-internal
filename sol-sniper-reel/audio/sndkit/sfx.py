@@ -1,4 +1,4 @@
-"""Sound design: one synthesizer per cue type.
+"""Sound design: one synthesizer per cue type (cue semantics: see the top of build_audio.py).
 
 Each synth returns a list of layers (signal, offset_samples, sends) where
 `signal` is stereo (2, n), `offset_samples` is relative to the cue sample
@@ -22,12 +22,13 @@ LEVELS = {
     'riser': -25.0, 'reverse_swell': -26.0,
     'click': -19.0, 'tap_soft': -19.0, 'ui_blip': -20.0, 'success': -19.0, 'toast': -19.0,
     'tick': -23.0, 'text_reveal': -24.0,
+    'whip': -17.0, 'punch': -14.0, 'click_final': -15.0,
 }
 
 # UI transients also get a sample-peak cap (dB, before the cue's own gain offset): their 15-20 dB
 # crest factor would otherwise put their peaks level with the impacts and make the master limiter
 # pump on every click.
-PEAK_CAP = {'click': -7.5, 'tap_soft': -7.5, 'tick': -7.5, 'toast': -7.5}
+PEAK_CAP = {'click': -7.5, 'tap_soft': -7.5, 'tick': -7.5, 'toast': -7.5, 'click_final': -6.0, 'punch': -5.0}
 
 # Music ducking while a cue plays (look-ahead, offline): (band, depth dB, hold s, release s).
 # 'ui' ducks only the music's 1-8 kHz band (makes room for UI sounds without losing the groove),
@@ -38,10 +39,13 @@ DUCK = {
     'ui_blip': ('ui', 4.0, 0.08, 0.14), 'success': ('tone', 6.0, 0.25, 0.2), 'toast': ('ui', 3.0, 0.18, 0.16),
     'hit_cut': ('full', 1.5, 0.04, 0.15), 'impact_drop': ('full', 2.0, 0.08, 0.3),
     'impact_outro': ('full', 1.5, 0.1, 0.4),
+    'click_final': ('ui', 4.0, 0.08, 0.25), 'punch': ('full', 1.0, 0.03, 0.12),
 }
 
-TRANSIENT_TYPES = ('impact_big', 'impact_drop', 'impact_outro', 'hit_cut', 'click', 'tap_soft',
-                   'tick', 'ui_blip', 'success', 'toast')
+TRANSIENT_TYPES = ('impact_big', 'impact_drop', 'impact_outro', 'hit_cut', 'punch', 'click', 'click_final',
+                   'tap_soft', 'tick', 'ui_blip', 'success', 'toast')
+# cues whose sound ENDS at t (rendered at a negative offset); everything else starts at t
+END_ALIGNED = ('riser', 'reverse_swell', 'whip')
 
 
 def _noise(n, *seed):
@@ -447,8 +451,157 @@ def text_reveal(seed, p=0.0):
     return [(sig, 0, {'plate': 0.35})]
 
 
+# --------------------------------------------------------------------------- camera moves
+def whip(seed, dur, p=0.0, d=1.0):
+    """Whip pan: an aggressive, accelerating whoosh that builds over `dur` and ENDS AT the cue
+    with a sharp stop (2 ms), because the camera lands on t (usually on an impact).
+
+    Band noise whose centre climbs 420 Hz -> 5.6 kHz and narrows as it speeds up, a resonant
+    'rip' (Q 5 band sweeping 650 Hz -> 4.8 kHz: the pitched whistle of a fast pan), an air band
+    riding above, a light low-mid body (kept above 110 Hz so the pre-drop gap stays clean under
+    the impact's sub), turbulence flutter that speeds up (22 -> 60 Hz), and a stereo sweep across
+    the field in the direction `d`, landing just past `p`. A little room/hall send lets the hard
+    stop breathe, so it doesn't read as a digital cut."""
+    dur = max(float(dur), 0.06)
+    n = ns(dur)
+    t = taxis(n)
+    x = t / dur
+
+    def mag(tt, f):
+        u = np.clip(tt / dur, 0, 1)
+        fc = 420.0 * (5600.0 / 420.0) ** (u ** 1.5)
+        z = np.log2(np.maximum(f, 1.0) / fc) / (0.8 - 0.3 * u)
+        return np.exp(-0.5 * z * z) + 0.03 * (f > 150.0)
+
+    def mag_air(tt, f):
+        u = np.clip(tt / dur, 0, 1)
+        fc = np.minimum(1600.0 * (12500.0 / 1600.0) ** (u ** 1.3), 12500.0)
+        z = np.log2(np.maximum(f, 1.0) / fc) / 0.6
+        return np.exp(-0.5 * z * z)
+
+    main = _decor(n, mag, seed, 0.6)
+    air = _decor(n, mag_air, seed + 5, 0.3) * 0.45
+    rip = np.zeros((2, n))
+    for c in range(2):
+        z = tv_biquad(_noise(n, 'whip-rip', seed, c), 'bandpass', 650.0 * (4800.0 / 650.0) ** (x ** 1.4), 5.0,
+                      block=32, stages=1)
+        rip[c] = z / (np.sqrt(np.mean(z ** 2)) + 1e-12)
+    rip = width(rip, 0.5) * 0.4
+    rate = 22.0 + 38.0 * x ** 1.5
+    flutter = 1.0 - 0.32 * x * (0.5 + 0.5 * np.cos(TAU * np.cumsum(rate) / SR))
+    env = x ** 2.0
+    sig = (main + air + rip) * (env * flutter)[None, :]
+    mb = lambda tt, f: band_mag(240.0, 0.5)(f) * np.ones_like(tt)
+    body = hp(shaped_noise(n, mb, seed + 9), 110.0, 2) * x ** 3 * 0.35
+    sig += np.vstack([body, body])
+    sig = sat(sig * 1.4, 1.2) / 1.4  # a little grit: denser, more aggressive at the peak
+    pth = (p - 0.8 * d) + 1.15 * d * x ** 1.6
+    gl = np.sqrt(2.0) * np.cos((np.clip(pth, -1, 1) + 1) * np.pi / 4)
+    gr = np.sqrt(2.0) * np.sin((np.clip(pth, -1, 1) + 1) * np.pi / 4)
+    sig = np.vstack([sig[0] * gl, sig[1] * gr])
+    sig = fades(sig, 0.008, 0.002)  # the stop: full level until 2 ms before t
+    return [(sig / 0.35, -n, {'room': 0.12, 'hall_big': 0.05, 'glue': 0.05})]
+
+
+def punch(seed, low_delay=0, low_polarity=1.0, low_only=False, thump=True):
+    """Camera punch-in: tight low thump (165 -> 54 Hz, gone in ~120 ms) + a short mid body and a
+    3 ms transient. No tail beyond a touch of room.
+
+    low_delay / low_polarity move only the thump (as for the impacts) so it sums with a grid kick
+    a few ms off the frame-snapped cue; thump=False drops it when an impact owns the low end."""
+    n = ns(0.14)
+    t = taxis(n)
+    th = _glide_sine(165.0, 54.0, 0.018, n) * np.exp(-(t / 0.055) ** 1.4)
+    th += lp(_noise(n, 'punch-puff', seed), 240.0, 2) * 2.0 * np.exp(-t / 0.012)
+    th[:ns(0.001)] *= cos_ramp(ns(0.001))
+    low = hp(th, 35.0, 2)
+    harm = np.tanh(3.0 * low / (np.max(np.abs(low)) + 1e-9))  # phone-speaker harmonics of the thump
+    low = (low + lp(hp(harm, 140.0, 2), 1400.0, 2) * 0.35) * low_polarity * (1.0 if thump else 0.0)
+    if low_only:
+        return low
+    if 0 < low_delay < n:
+        low = np.concatenate([np.zeros(low_delay), low[:-low_delay]])
+    body = bp(_noise(n, 'punch-body', seed), 250.0, 1100.0, 2) * np.exp(-t / 0.010) * 1.4
+    body += 0.45 * _glide_sine(300.0, 180.0, 0.008, n) * np.exp(-t / 0.018)
+    snap = np.zeros((2, n))
+    for c in range(2):
+        snap[c] = bp(_noise(n, 'punch-snap', seed, c), 2200.0, 8000.0, 2) * np.exp(-t / 0.0028) * 1.5
+    x = width(snap, 0.4) + np.vstack([low + body, low + body])
+    x = _onset_ramp(fades(x, 0.0, 0.03), 3)
+    return [(x, 0, {'room': 0.12, 'glue': 0.04})]
+
+
+def sparkle_notes(pad_midis, root_midi, lo=98, gap=2):
+    """Chord tones for the click_final sparkle: the chord's pitch classes (root left out when
+    enough remain) moved into the 2.3-4.6 kHz octave [lo, lo+12), no two closer than `gap`
+    semitones (a semitone cluster up there beats). Up to four notes."""
+    pcs = sorted({m % 12 for m in pad_midis})
+    if len(pcs) > 3 and root_midi % 12 in pcs:
+        pcs.remove(root_midi % 12)
+    cand = sorted(lo + (pc - lo) % 12 for pc in pcs)
+    out = []
+    for m in cand:
+        if not out or m - out[-1] >= gap:
+            out.append(m)
+    return tuple(out[:4])
+
+
+def click_final(seed, p=0.0, root_hz=103.83, notes=(99, 103, 106, 108)):
+    """End-card CTA confirm: the premium version of a click, in three layers.
+      1. a crisp press (the trackpad click's modes, slightly lower and fuller; no release click),
+      2. a soft low 'thock' tuned to the chord root (90-140 Hz octave) with a little 2nd-harmonic
+         body so it reads on phones,
+      3. an airy tail, mostly breath: a soft 6-12 kHz swell, a glitter of tiny noise grains that
+         thins out over ~0.5 s, and underneath a faint, short bloom of the chord's upper tones
+         (2.3-4.6 kHz) struck together with a few ms of random stagger (no rising arpeggio,
+         nothing 'level-up'), on the plate.
+    The press and the thock start on the cue sample; the tail sits ~20 dB under the press (a few dB
+    over the outro chord in its own 2-12 kHz bands for ~0.3 s)."""
+    n = ns(0.85)
+    t = taxis(n)
+    r = rng('cf', seed)
+    # 1. press
+    m = _modes(n, [2650.0, 4300.0, 6600.0, 1050.0], [0.0028, 0.0018, 0.001, 0.005], [1.0, 0.7, 0.25, 0.5])
+    z = hp(rng('cf-click', seed).standard_normal(n), 2000.0, 2) * np.exp(-t / 0.00035) * 0.75
+    clk = lp(hp(m + z, 600.0, 2), 10000.0, 2)
+    clk[:12] *= cos_ramp(12)
+    # 2. thock
+    th = _glide_sine(root_hz * 1.9, root_hz, 0.012, n) * np.exp(-t / 0.05)
+    th += 0.35 * _glide_sine(root_hz * 3.0, root_hz * 2.0, 0.01, n) * np.exp(-t / 0.025)
+    th += lp(_noise(n, 'cf-puff', seed), 500.0, 2) * 1.6 * np.exp(-t / 0.01)
+    th[:ns(0.0015)] *= cos_ramp(ns(0.0015))
+    th = hp(th, 60.0, 2)
+    hit = pan(clk + 1.2 * th, p)
+    hit = fades(hit, 0.0, 0.2)
+    # 3. tail: mostly air. A soft breath swell, a glitter of tiny band-passed noise grains whose
+    #    density thins out, and underneath a faint, short bloom of the chord's upper tones.
+    tail = np.zeros((2, n))
+    breath = _decor(n, lambda tt, f: band_mag(9000.0, 0.55)(f) * np.ones_like(tt), seed + 3, 0.35)
+    tail += breath * ((1.0 - np.exp(-t / 0.025)) * np.exp(-t / 0.28) * 0.22)[None, :]
+    g_times = np.sort(0.012 + r.exponential(0.16, 18))
+    for g_t in g_times[g_times < 0.6]:
+        a = ns(g_t)
+        gl_n = ns(r.uniform(0.002, 0.005))
+        gn = bp(r.standard_normal(gl_n + 64), 6500.0, 13000.0, 2)[64:] * np.hanning(gl_n)
+        amp = 0.30 * r.uniform(0.45, 1.0) * np.exp(-g_t / 0.30)
+        tail[:, a:a + gl_n] += pan(gn * amp, p + r.uniform(-0.7, 0.7))
+    order = r.permutation(len(notes))
+    pans = (-0.45, 0.45, -0.2, 0.25)
+    for k, i in enumerate(order):
+        f = float(midi_hz(notes[i])) * 2.0 ** (r.uniform(-4.0, 4.0) / 1200.0)
+        d0 = ns(0.008 + 0.012 * k + r.uniform(0.0, 0.006))
+        tt = taxis(n - d0)
+        vib = 1.0 + 0.0025 * np.sin(TAU * 5.5 * tt + r.random() * TAU)
+        tone = np.sin(TAU * np.cumsum(f * vib) / SR + r.random() * TAU)
+        tone *= 0.75 + 0.25 * np.sin(TAU * (7.0 + 2.0 * k) * tt + r.random() * TAU)
+        env = (1.0 - np.exp(-tt / 0.008)) * np.exp(-tt / (0.32 - 0.04 * k))
+        tail[:, d0:] += pan(tone * env * (1.0, 0.8, 0.65, 0.55)[k % 4] * 0.11, p + pans[k % 4])
+    tail = fades(tail, 0.0, 0.12)
+    return [(hit, 0, {'room': 0.10}), (tail, 0, {'plate': 0.30})]
+
+
 # --------------------------------------------------------------------------- dispatch
-POST_PAN = ('impact_big', 'impact_drop', 'impact_outro', 'hit_cut', 'zoom_through', 'riser',
+POST_PAN = ('impact_big', 'impact_drop', 'impact_outro', 'hit_cut', 'punch', 'zoom_through', 'riser',
             'reverse_swell', 'text_reveal')
 
 
@@ -475,6 +628,25 @@ def _offsets(trig, s, lo, hi):
     return [k - s for k in trig if lo <= k - s <= hi]
 
 
+def _kick_align(make_low, s, ctx, level_db, make_full, w20):
+    """Kick-aware placement of a cue's low layer: if a grid kick lies within 20 ms of the
+    frame-snapped cue, search the (delay, polarity) of the low layer that sums fullest with it.
+    Returns (kwargs for the synth, note) or ({}, None)."""
+    near = _offsets(ctx.get('kick_trig', []), s, -w20, w20)
+    if not near or 'kick_track' not in ctx:
+        return {}, None
+    rms0, _ = ref_level(make_full())
+    g0 = 10.0 ** (level_db / 20.0) / rms0
+    win = ns(0.15)
+    low = np.zeros(win)
+    lo = make_low() * g0
+    low[:min(win, len(lo))] = lo[:win]
+    dly, pol, gain_db = _best_low_alignment(low, ctx['kick_track'][s:s + win], w20, win)
+    kw = dict(low_delay=dly, low_polarity=pol) if (dly or pol < 0) else {}
+    return kw, (f'kick {near[0] / SR * 1000:+.2f} ms: low layers moved {dly / SR * 1000:+.2f} ms'
+                f"{', polarity flipped' if pol < 0 else ''} ({gain_db:+.1f} dB low end vs as-is)")
+
+
 def render_cue(cue, idx, ctx):
     """Render one cue -> [(stereo signal, offset, sends)], level-set per LEVELS / PEAK_CAP.
 
@@ -497,17 +669,10 @@ def render_cue(cue, idx, ctx):
     if typ in ('impact_big', 'impact_drop', 'impact_outro'):
         kind = typ.split('_')[1]
         make = lambda **k: impact(kind, seed, **k)
-        near = _offsets(kicks, s, -w20, w20)  # a grid kick within 20 ms of the frame-snapped cue
-        if near and 'kick_track' in ctx:
-            rms0, _ = ref_level(make())
-            g0 = 10.0 ** ((LEVELS[typ] + gain) / 20.0) / rms0
-            low = impact(kind, seed, low_only=True) * g0
-            win = ns(0.15)
-            dly, pol, gain_db = _best_low_alignment(low, ctx['kick_track'][s:s + win], w20, win)
-            if dly or pol < 0:
-                kw.update(low_delay=dly, low_polarity=pol)
-            note.append(f'kick {near[0] / SR * 1000:+.2f} ms: low layers moved {dly / SR * 1000:+.2f} ms'
-                        f"{', polarity flipped' if pol < 0 else ''} ({gain_db:+.1f} dB low end vs as-is)")
+        k_kw, k_note = _kick_align(lambda: impact(kind, seed, low_only=True), s, ctx, LEVELS[typ] + gain, make, w20)
+        kw.update(k_kw)
+        if k_note:
+            note.append(k_note)
     elif typ == 'hit_cut':
         near_k = [o for o in _offsets(kicks, s, -w20, w20) if abs(o) >= ns(0.001)]
         if near_k:
@@ -559,6 +724,30 @@ def render_cue(cue, idx, ctx):
         make = lambda **k: toast(seed, 0.25 if 'pan' not in cue else p, **k)
     elif typ == 'text_reveal':
         make = lambda **k: text_reveal(seed, p)
+    elif typ == 'whip':
+        make = lambda **k: whip(seed, float(cue.get('dur', 0.15)), p, d)
+    elif typ == 'punch':
+        make = lambda **k: punch(seed, **k)
+        imp = [c for c in cues if c['type'] in ('impact_big', 'impact_drop', 'impact_outro') and abs(c['t'] - t) <= 0.03]
+        if imp:
+            kw['thump'] = False
+            note.append(f"no thump ({imp[0]['type']} {1000 * (imp[0]['t'] - t):+.1f} ms owns the low end)")
+        else:
+            k_kw, k_note = _kick_align(lambda: punch(seed, low_only=True), s, ctx, LEVELS[typ] + gain, make, w20)
+            kw.update(k_kw)
+            if k_note:
+                note.append(k_note)
+    elif typ == 'click_final':
+        root_m, pad_m = ctx['chord_tones'](t) if 'chord_tones' in ctx else (32, [51, 56, 67, 70, 72, 75])
+        root_hz = float(midi_hz(root_m))
+        while root_hz < 90.0:
+            root_hz *= 2.0
+        while root_hz >= 140.0:
+            root_hz /= 2.0
+        sp = sparkle_notes(pad_m, root_m)
+        names = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
+        note.append(f'thock {root_hz:.1f} Hz, tail ' + '+'.join(f'{names[m % 12]}{m // 12 - 1}' for m in sp))
+        make = lambda **k: click_final(seed, p, root_hz, sp)
     else:
         raise ValueError(f'unknown cue type {typ}')
     layers = make(**kw)

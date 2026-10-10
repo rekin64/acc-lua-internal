@@ -8,14 +8,21 @@ A vertical 1080×1920 reel for Instagram Reels and TikTok, exactly 15.0 s long a
 
 | Time | Section | What happens | Super |
 |---|---|---|---|
-| 0.00–1.43 | Title | Impact on black; type masks in; "REDEFINED." turns brand-colored on the beat | MEMECOIN SNIPING. REDEFINED. |
-| 1.43–4.00 | Site reveal | The landing page rises as a card, the camera pushes onto the logo, glides to the hero, and the cursor clicks **Start Sniping** | Built for speed. |
-| 4.00–6.23 | Demo | Zoom-through the button into the app. A new pair is detected (AI score 94), sniped from the feed, and filled | Spot. Snipe. React. |
-| 6.23–9.60 | Drop | Whip pan to the live chart (entry marker, PnL), a second entry in the trade panel (Executing, then Filled), positions update, take-profit hits at +50%, then a pull-out to the full terminal | Fast entries. Clean execution. |
-| 9.60–12.47 | Montage | One cut per beat, then half-beats: headline, CTA press, feed streaming, PnL, candles, Filled, AI score, logo | n/a |
-| 12.47–15.00 | Outro | Match-cut on the logo, the **Start Sniping** CTA springs in, final click | SOL Sniper / Start Sniping |
+| 0.00–1.43 | Title | Impact; type masks in over a dark, defocused live terminal; "REDEFINED." turns brand-colored on the beat | MEMECOIN SNIPING. REDEFINED. |
+| 1.43–4.00 | Site reveal | Hard cut to light: the landing page rises as a card, the camera pushes onto the logo, glides to the hero, and the cursor clicks **Start Sniping**. The camera zooms through the button | Built for speed. |
+| 4.00–6.23 | Demo | In the app, a new pair streams in and the camera punches onto AI score 94. Snipe, then Sniping, then Bought; a "Buy filled" notification follows. The camera settles on the GLINT row through the pre-drop gap | Spot. Snipe. React. |
+| 6.23–9.60 | Drop | A whip pan lands on the chart on the drop (launch, then entry, then climb; Sim PnL ≈ +12%). The camera follows the cursor through a second buy (0.5 SOL, Executing, then Filled). Positions update and FROGO's take-profit hits at +30%. Then a pull-out to the full terminal | Fast entries. Clean execution. |
+| 9.60–12.47 | Montage | One cut per beat, then half-beats: headline, CTA press, new pairs streaming, PnL column, chart, Filled, AI 94 + Bought, logo push | n/a |
+| 12.47–15.00 | Outro | Match-cut on the logo, which glides up into the site hero rebuilt as an end card ("AI Memecoin Trading."). The **Start Sniping** CTA springs in and gets a final click | SOL Sniper / Start Sniping |
 
-All trading moments are presented as a **simulated demo**. The app shows a "Demo mode · simulated" chip, a "Simulated demo" label stays on screen during trade footage, and the end card carries a short disclaimer. Positions include a small loss, so the demo reads as honest rather than as promised returns.
+All trading moments are presented as a **simulated demo**:
+- The app shows a "Demo mode · simulated" chip, and PnL figures are labelled "Sim PnL" and "Total PnL · sim".
+- A "Simulated demo" label is on screen throughout the trade footage.
+- The end card carries the disclaimer "Simulated demo trades. Not financial advice. Crypto trading is high risk."
+
+Returns are kept modest: GLINT is about +10–13%, MOCHI +8%, and one loss is shown (ZORP −4.1%). The take-profit at +30% matches the app's Auto-sell setting (TP +30% · SL −15%). A sniper's chart starts at the token's launch (15 s candles), and the whip on the drop reads as a time jump.
+
+**Before running it as a paid ad:** Meta's crypto-advertising policy applies to the advertiser. Repeat the disclaimer in the post caption.
 
 ## How it's built
 
@@ -35,7 +42,7 @@ scripts/encode.py         linear-light sub-frame blend (motion blur) + dither �
 assets/source/            your original screenshot (and the cropped site region)
 ```
 
-Everything is deterministic, so any frame can be rendered at any time, in any order, on any number of workers.
+Everything is deterministic, so any frame can be rendered at any time, in any order, on any number of workers. Product UI state is frame-locked: numbers, rows and buttons hold constant across a frame's motion-blur sub-samples and tick at 7.5 Hz, like a real screen capture. Only the camera, the cursor and the editor's typography move continuously, so only they get motion blur.
 
 ## Commands
 

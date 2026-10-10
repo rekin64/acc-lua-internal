@@ -16,7 +16,7 @@
 import { clamp, lerp, prog, remap, ease, kf, spring, css, h } from './lib/engine.js';
 import { FPS, beat, snap } from './timing.js';
 import { createSite, createSiteBackground } from './components/site.js';
-import { createApp } from './components/app.js';
+import { createApp, fillQuote } from './components/app.js';
 import { createLogo } from './components/brand.js';
 import { createCursor, cursorAt, clickState } from './components/cursor.js';
 
@@ -254,19 +254,18 @@ export function buildReel(stage) {
   const tradeCam = (z) => () => { const r = AR('trade'); return aim(r.cx, r.y + r.h / 2, z, CX, 680); };
   const elCam = (name, z, sy) => () => { const r = AR(name); return aim(r.cx, r.cy, z, CX, sy); };
   const posCam = (z) => () => { const r = AR('positions'); return aim(r.cx, r.y + r.h / 2, z, CX, 700); };
-  const rowCam = (tk, z) => () => { const r = AR('positions.row.' + tk); return aim(r.cx, r.cy, z, CX, 720); };
+  const rowCam = (tk, z) => () => { const r = AR('positions.row.' + tk); return aim(r.x + r.w * 0.52, r.cy, z, CX, 720); };
   const s3Keys = [
     K(T3, feedCam(1.55)),
     K(T3 + 0.4, feedCam(FEED_Z), ease.glide),                 // keeps pushing in after the zoom-through
     K(B(9) + 0.1, feedCam(FEED_Z + 0.03), ease.linear),
     K(B(9) + 0.42, aiCam(2.6), ease.ramp),                    // Spot: punch onto AI 94 + Snipe
     K(B(11) - 0.05, aiCam(2.72), ease.linear),                // Snipe -> Sniping -> Bought
-    K(B(11.6), feedCam(1.9, 30), ease.inOutCubic),            // React: breathe out for the notification
-    K(B(12.5), rowCamFeed(2.45), ease.inOutSine),             // build: push onto the GLINT row
-    K(WHIP0, rowCamFeed(2.52), ease.linear),                  // hold through the pre-drop gap
-    K(WHIP1, chartCam(1.72), ease.inOutExpo),                 // whip lands ON the drop
-    K(B(13) + 0.3, chartCam(1.78), ease.outSine),
-    K(B(14), pnlCam(2.3), ease.inOutSine),                    // settle on the PnL chip
+    K(B(12.5), rowCamFeed(2.5), ease.inOutSine),              // React + build: settle onto the GLINT row
+    K(WHIP0, rowCamFeed(2.56), ease.linear),                  // hold through the pre-drop gap
+    K(WHIP1, chartCam(1.42, 0.5), ease.inOutExpo),            // whip lands ON the drop: launch -> entry -> climb
+    K(B(13) + 0.1, chartCam(1.44, 0.5), ease.outSine),
+    K(B(14), pnlCam(1.72), ease.inOutSine),                   // drift toward the Sim PnL chip
     K(B(14), tradeCam(1.62)),                                 // hard cut: trade panel
     K(B(14.5) - 0.12, elCam('trade.preset.1', 2.35, 760), ease.glide), // cursor-follow punch-in
     K(B(15) - 0.08, elCam('trade.buy', 2.15, 900), ease.easy),
@@ -275,10 +274,10 @@ export function buildReel(stage) {
     K(B(16), tradeCam(1.66), ease.linear),
     K(B(16) + 0.3, posCam(1.82), ease.ramp),                  // pan to positions
     K(B(17) - 0.06, posCam(1.86), ease.linear),
-    K(B(17) + 0.24, rowCam('GLINT', 2.55), ease.glide),       // GLINT position ticks up
-    K(B(18) - 0.2, rowCam('GLINT', 2.6), ease.linear),
-    K(B(18), rowCam('FROGO', 2.75), ease.ramp),               // take-profit lands on the beat
-    K(B(19), rowCam('FROGO', 2.82), ease.linear),
+    K(B(17) + 0.24, rowCam('GLINT', 2.25), ease.glide),       // GLINT position ticks up
+    K(B(18) - 0.2, rowCam('GLINT', 2.3), ease.linear),
+    K(B(18), rowCam('FROGO', 2.4), ease.ramp),               // take-profit lands on the beat
+    K(B(19), rowCam('FROGO', 2.46), ease.linear),
     { t: T4_END, x: 960, y: 540, z: 0.555, e: ease.ramp },    // pull-out: the whole terminal
   ];
   const s3Clicks = [B(10), B(14.5), B(15)];
@@ -292,12 +291,15 @@ export function buildReel(stage) {
   stage.appendChild(simChip);
   const toast = h(`<div class="ntoast">
       <div class="ic"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.2 4.2L19 7" stroke="#12A16B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="tx"><div class="t1">Buy filled · 1.00 SOL</div><div class="t2">18.2M GLINT · TP +30% / SL −15% armed</div></div>
+      <div class="tx"><div class="t1">Buy filled · 1.00 SOL</div><div class="t2">${fillQuote({ feed: { snipeState: 'done' } }, 1).tokensText} · TP +30% / SL −15% armed</div></div>
       <div class="tag">Simulated</div>
     </div>`);
   stage.appendChild(toast);
 
-  const REVEAL = (t) => remap(t, T3, T4_END, 0.84, 1);
+  // During the feed shots GLINT has just launched (entry candle forming), so the snipe
+  // fills at ~0%. The whip on the drop is a time jump: minutes later, the climb.
+  const REVEAL = (t) => (t < WHIP1 ? 0.055 : remap(t, T3, T4_END, 0.84, 1));
+  const CLOCK = (t) => tick(t) + (t < WHIP1 ? 0 : 690);
   const FILL2 = REVEAL(tick(B(15.5)));
   function appState(t) {
     const tf = fl(t), td = tick(t);
@@ -305,7 +307,7 @@ export function buildReel(stage) {
     const { press } = clickState(tf, s3Clicks);
     const near = (c) => (Math.abs(tf - c) < 0.2 ? press : 0);
     return {
-      t: td,
+      t: CLOCK(t), tMotion: tf,
       feed: {
         inserted: ins,
         highlight: 'GLINT',
@@ -314,7 +316,7 @@ export function buildReel(stage) {
         snipePress: near(B(10)),
         snipeState: tf < B(10) + 0.05 ? 'idle' : tf < B(10.6) ? 'pending' : 'done',
       },
-      chart: { reveal: REVEAL(td), entry: 1, pnlFlash: bump(tf, B(13), B(13) + 0.5) },
+      chart: { reveal: REVEAL(td), entry: tf >= B(10.6) ? 1 : 0, pnlFlash: bump(tf, B(13), B(13) + 0.5) },
       trade: {
         preset: tf < B(14.5) + 0.03 ? 2 : 1,
         presetHover: tf > B(14.5) - 0.1 && tf < B(14.5) + 0.16 ? 1 : -1,
@@ -386,9 +388,8 @@ export function buildReel(stage) {
   const BR = (n) => appB.rect(n);
   // the story continues: final states only (no rewinds), live clock keeps ticking
   const baseApp = (t) => {
-    const td = tick(t);
     return {
-      t: td,
+      t: tick(t) + 690, tMotion: fl(t),
       feed: { inserted: 3, highlight: 'GLINT', highlightAmt: 1, snipeState: 'done' },
       chart: { reveal: 1, entry: 1 },
       trade: { preset: 1, buyState: 'filled', fillAt: FILL2 },

@@ -104,15 +104,16 @@ SHORT = {
     'whoosh_fast': 'wsh', 'whoosh_long': 'wshL', 'whoosh_rise': 'wshR', 'zoom_through': 'zoom',
     'riser': 'riser', 'reverse_swell': 'rev', 'click': 'click', 'tap_soft': 'tap', 'ui_blip': 'blip',
     'success': 'succ', 'toast': 'toast', 'tick': 'tick', 'text_reveal': 'txt',
+    'whip': 'whip', 'punch': 'punch', 'click_final': 'CLICK',
 }
 
 
 def _cue_color(typ):
     if typ.startswith('impact'):
         return (255, 80, 80)
-    if typ == 'hit_cut':
+    if typ in ('hit_cut', 'punch'):
         return (255, 170, 60)
-    if typ in ('click', 'tap_soft', 'tick', 'ui_blip', 'success', 'toast'):
+    if typ in ('click', 'click_final', 'tap_soft', 'tick', 'ui_blip', 'success', 'toast'):
         return (80, 220, 255)
     return (170, 170, 255)
 
@@ -214,7 +215,7 @@ def waveform_png(path, mix, music, sfx, cues, sections, W=1800, H=980):
         d.text((xx + 3, 24), name, fill=(80, 80, 90), font=fs)
     for c in cues:
         xx = ml + int(c['t'] / dur * (pw - 1))
-        d.line([(xx, 40), (xx, bottom)], fill=_cue_color(c['type']) if c['type'] not in ('whoosh_fast', 'whoosh_long', 'whoosh_rise', 'riser', 'reverse_swell', 'text_reveal') else (190, 190, 235), width=1)
+        d.line([(xx, 40), (xx, bottom)], fill=_cue_color(c['type']) if c['type'] not in ('whoosh_fast', 'whoosh_long', 'whoosh_rise', 'whip', 'riser', 'reverse_swell', 'text_reveal') else (190, 190, 235), width=1)
     im.save(path)
 
 

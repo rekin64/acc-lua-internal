@@ -241,7 +241,7 @@
   box-shadow: 0 1px 2px rgba(10, 110, 70, 0.25), 0 0 0 calc(var(--fl) * 3px) rgba(18, 161, 107, calc(var(--fl) * 0.2));
   transform: scale(calc(1 + var(--fl) * 0.03)); transform-origin: 60% 50%;
 }
-.app .ap-pnl::before { content: 'PnL'; font-weight: 600; font-size: 12px; opacity: 0.8; margin-right: 2px; }
+.app .ap-pnl::before { content: 'Sim PnL'; font-weight: 600; font-size: 12px; opacity: 0.85; margin-right: 2px; }
 .app .ap-pnl.ap-neg {
   background: color-mix(in srgb, #EF5A5F calc(var(--fl) * 100%), var(--down));
   box-shadow: 0 1px 2px rgba(150, 30, 35, 0.25), 0 0 0 calc(var(--fl) * 3px) rgba(229, 72, 77, calc(var(--fl) * 0.2));

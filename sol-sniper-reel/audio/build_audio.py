@@ -4,24 +4,77 @@
   node scripts/export-timing.mjs      # (re)export audio/timing.json from src/timing.js
   python3 audio/build_audio.py        # -> audio/soundtrack.wav (+ stems, analysis, PNGs)
 
-Reads audio/timing.json (bpm, sections, music markers, cues) and writes:
-  audio/soundtrack.wav        48 kHz / 24-bit stereo, exactly 15.000 s (720000 samples)
-  audio/stems/music.wav       pre-master music bus (24-bit)
-  audio/stems/sfx.wav         pre-master SFX bus   (one shared gain: music + sfx = pre-master mix)
-  audio/analysis.txt          loudness, peaks, start/end checks, energy curve, cue alignment + UI
-                              audibility, limiter activity per cue, stereo, low-end alignment, spectra
-  audio/spectrogram.png       full-range log-frequency spectrogram with cue markers
-  audio/spectrogram_low.png   20-400 Hz detail (low-end cleanliness)
-  audio/waveform.png          mix / music / sfx waveforms + momentary loudness + cues
-  audio/onsets.png            +-25 ms zooms of every transient cue (cue vs detected onset)
+Options:
+  --timing PATH   build from this timing JSON instead of audio/timing.json (used as is, no
+                  re-export; same as env SOL_TIMING=PATH). For trying cue lists on a copy.
+  --out DIR       write soundtrack.wav, stems/, analysis.txt and the PNGs to DIR (default audio/)
+  --fast          skip the PNGs
+  --no-ffmpeg     skip every ffmpeg step: no AAC delivery guard (see MASTERING), no ebur128 report
 
-Python 3 + numpy + scipy only. No samples, no downloads, fixed seeds -> bit-identical
-output on every run. Only `--fast` (skip PNGs) and `--no-ffmpeg` flags are accepted.
+Reads the timing JSON (bpm, sections, music markers, cues) and writes:
+  soundtrack.wav        48 kHz / 24-bit stereo, exactly 15.000 s (720000 samples)
+  stems/music.wav       pre-master music bus (24-bit)
+  stems/sfx.wav         pre-master SFX bus   (one shared gain: music + sfx = pre-master mix)
+  analysis.txt          loudness, WAV + AAC-delivery peaks, start/end + outro checks, energy curve,
+                        cue alignment (onsets and end-aligned cues) + UI audibility, limiter activity
+                        per cue, stereo, low-end alignment, spectra
+  spectrogram.png       full-range log-frequency spectrogram with cue markers
+  spectrogram_low.png   20-400 Hz detail (low-end cleanliness)
+  waveform.png          mix / music / sfx waveforms + momentary loudness + cues
+  onsets.png            +-25 ms zooms of every transient cue (cue vs detected onset)
+
+CUE SEMANTICS (timing.json `cues`: {t, type, gain?, pan?, dir?, dur?}; any cue list works)
+  t      seconds. Onset cues put their transient ON the sample round(t * 48000) (no pre-roll);
+         END-ALIGNED cues (riser, reverse_swell, whip) end on that sample instead.
+  gain   dB offset from the type's default level (sndkit/sfx.py LEVELS, PEAK_CAP).
+  pan    -1..1, applies to every type; moving sounds (whooshes, whip) sweep through it.
+  dir    +-1, which way a sweep crosses the stereo field; default = sign of pan, else +1.
+  dur    seconds, for the types marked (dur).
+
+  impact_big | impact_drop | impact_outro
+                 layered impact: sub drop + boom + punch + crack (+ hall). Low layers are
+                 phase-aligned to a grid kick 1-20 ms away.
+  hit_cut        cinematic cut accent: snap + mid thock + low knock + room.
+  punch          camera punch-in: tight low thump (165 -> 54 Hz) + short body + 3 ms transient,
+                 ~120 ms, no tail. Transient at t. The thump is dropped when an impact_* lies
+                 within 30 ms (the impact owns the low end); otherwise it is phase-aligned to a
+                 grid kick 1-20 ms away, like the impacts.
+  whoosh_fast    0.27 s whoosh starting at t.          whoosh_rise   0.66 s rising whoosh from t.
+  whoosh_long    (dur) whoosh starting at t, lasting dur.
+  whip           (dur, pan, dir) whip pan: an aggressive whoosh that BUILDS over dur and ENDS AT t
+                 with a 2 ms hard stop, because the camera lands on t (put the impact on the same
+                 t). Sounds from t - dur to t (dur >= 0.06 s); sweeps across the field in `dir`
+                 and lands just past `pan`; a touch of room keeps the stop natural.
+  zoom_through   (dur) accelerating whoosh from t, landing on a soft thump at t + dur.
+  riser          (dur) noise + tonal crescendo that ENDS AT t.
+  reverse_swell  (dur) reversed reverb of the chord at t, ENDS AT t.
+  click          trackpad click: press at t + soft release 80 ms later (press only when clicks
+                 are < 0.25 s apart).
+  click_final    end-card CTA confirm: crisp press + soft low 'thock' tuned to the chord root
+                 (both at t), then an airy tail (~0.5 s, ~15 dB under the press) of the chord's
+                 upper tones struck together + breath + sparse glints on the plate. Ducks the
+                 music's 1-8 kHz band by 4 dB so it reads over the outro chord.
+  tap_soft, tick, ui_blip, success, toast, text_reveal: UI / type sounds (sndkit/sfx.py).
+
+MASTERING (sndkit/master.py): hp 18 Hz -> glue comp -> soft clip -> 4x true-peak limiter at
+TP_CEILING -> AAC delivery guard -> end fade, with the make-up gain iterated to -14 LUFS.
+  AAC delivery guard: the master is encoded exactly like scripts/encode.py (ffmpeg native AAC-LC
+  320k, 48 kHz), decoded, and measured with a 4x true-peak meter and ffmpeg ebur128. Wherever
+  the decoded AAC would exceed AAC_TP_TARGET, a smooth gain dip (one AAC window wide) is applied
+  after the limiter and the master is re-run, until the AAC result passes. Deterministic for a
+  given ffmpeg build; skipped with --no-ffmpeg (then only the WAV ceiling applies).
+  End: the music holds the last chord to the end; the mix stays up to 15.000 - FADE_OUT s and a
+  raised-cosine fade reaches digital silence (0) exactly on the last sample.
+
+Python 3 + numpy + scipy only. No samples, no downloads, fixed seeds -> bit-identical output on
+every run (with the same ffmpeg build for the AAC guard).
 """
 import sys
 
 sys.dont_write_bytecode = True
 
+import argparse  # noqa: E402
+import hashlib  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 import re  # noqa: E402
@@ -33,7 +86,7 @@ import wave  # noqa: E402
 
 import numpy as np  # noqa: E402
 from scipy import signal  # noqa: E402
-from scipy.ndimage import uniform_filter1d  # noqa: E402
+from scipy.ndimage import convolve1d, maximum_filter1d, uniform_filter1d  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -46,8 +99,11 @@ from sndkit import sfx as FX  # noqa: E402
 from sndkit.dsp import SR, add_at, convolve_ir, event_duck, make_ir, ns, zp  # noqa: E402
 
 TARGET_LUFS = -14.0
-TP_CEILING = -2.5          # limiter ceiling (dBTP); spec <= -1 dBTP. The extra 1.5 dB is for AAC re-encodes:
-                           # ffmpeg's AAC adds up to ~1.4 dB on a sharp hit at 320k, depending on frame alignment
+TP_CEILING = -2.5          # WAV limiter ceiling (dBTP); spec <= -1 dBTP
+AAC_TP_TARGET = -1.5       # decoded AAC delivery true peak (dBTP). Spec <= -1.0 on the muxed MP4,
+                           # release target <= -1.2; 0.3 dB of margin under that
+AAC_ARGS = ['-c:a', 'aac', '-b:a', '320k', '-ar', '48000']  # = scripts/encode.py
+FADE_OUT = 0.15            # end fade (s): the mix is held up to 14.85 s, digital silence AT 15.000
 MUSIC_GAIN = 1.0
 SFX_GAIN = 1.0
 
@@ -86,6 +142,38 @@ def ffmpeg_ebur128(path):
     g = lambda pat: float(re.search(pat, summ, re.S).group(1)) if re.search(pat, summ, re.S) else None
     return dict(I=g(r'I:\s+(-?[\d.]+) LUFS'), LRA=g(r'LRA:\s+(-?[\d.]+) LU'),
                 TP=g(r'True peak:.*?Peak:\s+(-?[\d.inf]+) dBFS'))
+
+
+def aac_roundtrip(x, td, mux=False):
+    """Encode `x` (a float array, written with write_wav24 = the very bytes of soundtrack.wav, or the
+    path of a WAV file) exactly the way scripts/encode.py does (WAV input with `-ss 0.0000`, ffmpeg
+    AAC 320k 48 kHz, `-t` = reel length) and decode it back. mux=True writes an .mp4 with a dummy
+    H.264 stream next to the audio, like the real delivery; mux=False an .m4a (same AAC stream).
+    The AAC encoder is sensitive to LSB-level changes (its overshoot moves by ~0.1 dB), so always
+    measure the exact bytes that get delivered.
+    -> (decoded float64 (2, n), ebur128 dict, md5 of the decoded audio)."""
+    if isinstance(x, str):
+        wav = x
+        with wave.open(wav, 'rb') as wf:
+            dur = f'{wf.getnframes() / wf.getframerate():.3f}'
+    else:
+        wav = os.path.join(td, 'master.wav')
+        write_wav24(wav, x)
+        dur = f'{x.shape[1] / SR:.3f}'
+    if mux:
+        out = os.path.join(td, 'delivery.mp4')
+        cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=white:s=1080x1920:r=30',
+               '-ss', '0.0000', '-i', wav, '-map', '0:v', '-map', '1:a',
+               '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '40', *AAC_ARGS,
+               '-t', dur, '-movflags', '+faststart', out]
+    else:
+        out = os.path.join(td, 'delivery.m4a')
+        cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-ss', '0.0000', '-i', wav, *AAC_ARGS, '-t', dur, out]
+    subprocess.run(cmd, check=True)
+    raw = subprocess.run(['ffmpeg', '-loglevel', 'error', '-i', out, '-map', '0:a', '-f', 'f32le', '-'],
+                         capture_output=True, check=True).stdout
+    dec = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2).T.astype(np.float64)
+    return dec, ffmpeg_ebur128(out), hashlib.md5(raw).hexdigest()
 
 
 # --------------------------------------------------------------------------- build
@@ -130,16 +218,33 @@ def build(timing, log, info=None):
     ctx = dict(riser_target=riser_target, swell_chord=swell_chord, ir_swell=ir_swell, cues=timing['cues'],
                kick_trig=kick_trig, clap_trig=events['clap'], chord_at_time=MU.chord_at_time,
                kick_track=np.mean(tracks['kick'], axis=0),
+               chord_tones=lambda t: (MU.CHORDS[MU.chord_at_time(t + 0.01)]['root'],
+                                      MU.CHORDS[MU.chord_at_time(t + 0.01)]['pad']),
                notes={}, soft_onset=set())
     dry = np.zeros((2, N))
     buses = {k: np.zeros((2, N)) for k in ('hall_big', 'room', 'plate', 'glue')}
+    spans = {}  # cue index -> (first, last + 1) sample of its dry sound; dry signal for END_ALIGNED
+    ea_dry = np.zeros((2, N))  # dry END_ALIGNED sounds (riser, swell, whip): taken out for onset detection
     for i, cue in enumerate(timing['cues']):
-        for sig, off, sends in FX.render_cue(cue, i, ctx):
+        lay = FX.render_cue(cue, i, ctx)
+        for sig, off, sends in lay:
             s = ns(cue['t']) + off
             add_at(dry, sig * sends.get('_dry', 1.0), s)
+            if cue['type'] in FX.END_ALIGNED:
+                add_at(ea_dry, sig * sends.get('_dry', 1.0) * SFX_GAIN, s)
             for bus, g in sends.items():
                 if bus != '_dry':
                     add_at(buses[bus], sig * g, s)
+        dl = [(off, sig * sends.get('_dry', 1.0)) for sig, off, sends in lay if sends.get('_dry', 1.0) > 0]
+        if dl:
+            lo = min(o for o, _ in dl)
+            hi = max(o + x.shape[1] for o, x in dl)
+            iso = None
+            if cue['type'] in FX.END_ALIGNED:
+                iso = np.zeros((2, hi - lo))
+                for o, x in dl:
+                    iso[:, o - lo:o - lo + x.shape[1]] += x
+            spans[i] = (ns(cue['t']) + lo, ns(cue['t']) + hi, iso)
     sfx = dry + convolve_ir(buses['hall_big'], ir_sfx_hall) * 0.9 + convolve_ir(buses['room'], ir_ui_room) \
         + convolve_ir(buses['plate'], ir_plate) * 0.8 + convolve_ir(buses['glue'], ir_music_hall)
     sfx *= SFX_GAIN
@@ -161,12 +266,16 @@ def build(timing, log, info=None):
     music = music * g_full[None, :]
     log(f'  sfx {time.time() - t0:.1f}s')
     if info is not None:
-        info.update(notes=ctx['notes'], soft_onset=ctx['soft_onset'], events=events)
+        info.update(notes=ctx['notes'], soft_onset=ctx['soft_onset'], events=events, spans=spans, ea_dry=ea_dry)
     return music, sfx, tracks, kick_trig
 
 
-def ensure_timing(log):
-    """Re-export audio/timing.json if src/timing.js is newer (keeps picture and sound in sync)."""
+def ensure_timing(log, path=None):
+    """Load the timing JSON. Default: audio/timing.json, re-exported first if src/timing.js is newer
+    (keeps picture and sound in sync). An explicit path is loaded as is (never re-exported)."""
+    if path:
+        log(f'timing: {path} (as given, no re-export)')
+        return json.load(open(path))
     src = os.path.join(ROOT, 'src', 'timing.js')
     dst = os.path.join(HERE, 'timing.json')
     if os.path.exists(src) and (not os.path.exists(dst) or os.path.getmtime(src) > os.path.getmtime(dst)):
@@ -178,9 +287,66 @@ def ensure_timing(log):
     return json.load(open(dst))
 
 
+def master_for_delivery(pre, log, use_ffmpeg):
+    """Master, then check the AAC delivery encode of the exact bytes that will be written; where the
+    decoded AAC would exceed AAC_TP_TARGET, add a smooth post-limiter gain dip there and master
+    again (closed loop). ffmpeg's AAC rate control is global, so a dip can move a small overshoot
+    elsewhere: the loop keeps going until the whole file passes, and from the 5th pass on it also
+    lowers the WAV ceiling by the remaining excess (fallback; never needed so far).
+    -> (master, master info, guard_db per sample, AAC info or None)."""
+    n = pre.shape[1]
+    guard = np.zeros(n)
+    g_db = 4.0
+    ceiling = TP_CEILING
+    aac = None
+    ffmpeg_ok = use_ffmpeg and shutil.which('ffmpeg') is not None
+    if use_ffmpeg and not ffmpeg_ok:
+        log('WARNING: ffmpeg not found: AAC delivery guard skipped (WAV ceiling only)')
+    win = np.hanning(ns(0.01) + 1)
+    win /= win.sum()
+    with tempfile.TemporaryDirectory() as td:
+        for rnd in range(10):
+            out, minfo = MS.master(pre, TARGET_LUFS, ceiling, FADE_OUT, log=log,
+                                   guard_db=guard if guard.any() else None, g_db=g_db)
+            g_db = minfo['gain_db']
+            if not ffmpeg_ok:
+                break
+            dec, ff, _ = aac_roundtrip(out, td)
+            env = MS._tp_envelope(dec)
+            tp_own = float(20 * np.log10(env.max()))
+            tp = max(tp_own, ff['TP'] if ff and ff['TP'] is not None else -np.inf)
+            ok = tp <= AAC_TP_TARGET
+            aac = dict(tp_own=tp_own, ff=ff, rounds=rnd + 1, ceiling=ceiling, ok=ok)
+            log(f'  AAC guard pass {rnd}: decoded AAC true peak {tp_own:.2f} dBTP (ebur128 {ff["TP"]} dBFS), '
+                f'I {ff["I"]} LUFS -> {"OK" if ok else "over " + f"{AAC_TP_TARGET:.1f}"}')
+            if ok:
+                break
+            # required dip (aim 0.15 dB under the target), spread over +-1 long AAC window, smoothed
+            need = np.maximum(20 * np.log10(np.maximum(env[:n], 1e-9)) - (AAC_TP_TARGET - 0.15), 0.0)
+            need = maximum_filter1d(need, size=2 * 2048 + 1, mode='nearest')
+            guard += convolve1d(need, win, mode='nearest')
+            if rnd >= 4:
+                ceiling -= tp - AAC_TP_TARGET + 0.1
+                log(f'  AAC guard: lowering the WAV ceiling to {ceiling:.2f} dBTP')
+        if aac is not None and not aac['ok']:
+            log(f'WARNING: AAC delivery true peak {aac["tp_own"]:.2f} dBTP still over {AAC_TP_TARGET:.1f} after '
+                f'{aac["rounds"]} passes')
+    minfo['guard_db'] = guard
+    minfo['ceiling'] = ceiling
+    return out, minfo, guard, aac
+
+
 def main():
-    fast = '--fast' in sys.argv
-    use_ffmpeg = '--no-ffmpeg' not in sys.argv
+    ap = argparse.ArgumentParser(description='Build the SOL Sniper soundtrack (see the module docstring).')
+    ap.add_argument('--timing', default=os.environ.get('SOL_TIMING') or None,
+                    help='timing JSON to build from, used as is (default: audio/timing.json, re-exported '
+                         'from src/timing.js when that is newer). Env: SOL_TIMING')
+    ap.add_argument('--out', default=HERE, help='output directory (default: audio/)')
+    ap.add_argument('--fast', action='store_true', help='skip the PNGs')
+    ap.add_argument('--no-ffmpeg', action='store_true', help='skip ffmpeg (no AAC guard / ebur128)')
+    args = ap.parse_args()
+    use_ffmpeg = not args.no_ffmpeg
+    outdir = os.path.abspath(args.out)
     T0 = time.time()
     logs = []
 
@@ -188,7 +354,7 @@ def main():
         print(s, flush=True)
         logs.append(s)
 
-    timing = ensure_timing(log)
+    timing = ensure_timing(log, args.timing)
     log('building music + sfx')
     binfo = {}
     music, sfx, tracks, kick_trig = build(timing, log, binfo)
@@ -198,24 +364,27 @@ def main():
     pk = max(np.max(np.abs(music)), np.max(np.abs(sfx))) * g0
     stem_gain = g0 * min(1.0, 10.0 ** (-1.0 / 20.0) / pk)
     music_s, sfx_s = music * stem_gain, sfx * stem_gain
+    binfo['ea_dry'] = binfo['ea_dry'] * stem_gain
 
-    log('mastering')
-    out, minfo = MS.master(pre * g0, TARGET_LUFS, TP_CEILING, log=log)
+    log('mastering (+ AAC delivery guard)')
+    out, minfo, guard, aac = master_for_delivery(pre * g0, log, use_ffmpeg)
 
-    os.makedirs(os.path.join(HERE, 'stems'), exist_ok=True)
-    p_mix = os.path.join(HERE, 'soundtrack.wav')
+    os.makedirs(os.path.join(outdir, 'stems'), exist_ok=True)
+    p_mix = os.path.join(outdir, 'soundtrack.wav')
     write_wav24(p_mix, out)
-    write_wav24(os.path.join(HERE, 'stems', 'music.wav'), music_s)
-    write_wav24(os.path.join(HERE, 'stems', 'sfx.wav'), sfx_s)
+    write_wav24(os.path.join(outdir, 'stems', 'music.wav'), music_s)
+    write_wav24(os.path.join(outdir, 'stems', 'sfx.wav'), sfx_s)
     log(f'wrote {p_mix}  ({time.time() - T0:.1f}s)')
 
     log(f'stems: common gain {20 * np.log10(stem_gain):+.2f} dB (pre-master domain, before glue/limiter)')
-    analyse(timing, p_mix, music_s, sfx_s, tracks, kick_trig, minfo, use_ffmpeg, fast, logs, binfo)
+    analyse(timing, p_mix, music_s, sfx_s, tracks, kick_trig, minfo, use_ffmpeg, args.fast, logs, binfo,
+            outdir=outdir, aac=aac)
     log(f'done in {time.time() - T0:.1f}s')
 
 
 # --------------------------------------------------------------------------- analysis
-UI_AUDIBLE = ('click', 'tap_soft', 'tick', 'ui_blip', 'success', 'toast')
+UI_AUDIBLE = ('click', 'click_final', 'tap_soft', 'tick', 'ui_blip', 'success', 'toast')
+HIT_TYPES = ('hit_cut', 'punch', 'impact_big', 'impact_drop', 'impact_outro')
 
 
 def _marker(timing, name, default):
@@ -250,9 +419,24 @@ def energy_curve(timing, mix, w):
     t_build, t_gap = _marker(timing, 'build', 5.28), _marker(timing, 'gap', 6.0)
     drop_cue = [c['t'] for c in timing['cues'] if c['type'] == 'impact_drop']
     t_drop = drop_cue[0] if drop_cue else _marker(timing, 'drop', 6.24)
-    lb, lg = MS.segment_lufs(mix, t_build, t_gap), MS.segment_lufs(mix, t_gap, t_drop)
-    w(f"  build {t_build:.2f}-{t_gap:.2f}s {lb:.1f} LUFS, pre-drop gap {t_gap:.2f}-{t_drop:.3f}s {lg:.1f} LUFS: "
+    # a whip landing on the drop is the camera's own wind-up INTO the impact: the dip is the part
+    # of the gap before it (both are reported)
+    whips = [c for c in timing['cues'] if c['type'] == 'whip' and abs(c['t'] - t_drop) <= 0.02]
+    t_w = min(c['t'] - float(c.get('dur', 0.15)) for c in whips) if whips else t_drop
+    t_dip = t_w if t_w - t_gap >= 0.04 else t_drop
+    lb, lg = MS.segment_lufs(mix, t_build, t_gap), MS.segment_lufs(mix, t_gap, t_dip)
+    w(f"  build {t_build:.2f}-{t_gap:.2f}s {lb:.1f} LUFS, pre-drop gap {t_gap:.2f}-{t_dip:.3f}s"
+      f"{' (before the whip)' if t_dip < t_drop else ''} {lg:.1f} LUFS: "
       f"{lg - lb:+.1f} LU (want <= -3) -> {'OK' if lg - lb <= -3 else 'CHECK'}")
+    if t_dip < t_drop:
+        lw = MS.segment_lufs(mix, t_dip, t_drop)
+        tm, lm = MS.momentary(mix)
+        sel = (tm > t_dip) & (tm <= t_drop + 0.001)
+        dsel = (tm - 0.2 >= t_drop - 0.05) & (tm - 0.2 < t_drop + 0.6)
+        w(f"  whip wind-up {t_dip:.3f}-{t_drop:.3f}s {lw:.1f} LUFS ungated; momentary max into the drop "
+          f"{lm[sel].max():.1f} LUFS vs drop max {lm[dsel].max():.1f} LUFS "
+          f"({lm[sel].max() - lm[dsel].max():+.1f} LU, want <= -2) -> "
+          f"{'OK' if lm[sel].max() - lm[dsel].max() <= -2 else 'CHECK'}")
     ph = zp(zp(mix, 'highpass', 300.0, 4), 'lowpass', 12000.0, 2)  # crude phone speaker
     w('  phone-speaker sim (HP 300 Hz / LP 12 kHz), ungated: ' + '  '.join(
         f"{n} {MS.segment_lufs(ph, s['start'], s['end']):.1f}" for n, s in secs.items()))
@@ -270,7 +454,7 @@ def master_dynamics(timing, minfo, w):
       f"glue comp max GR {minfo['glue_gr_db']:.2f} dB at {minfo['glue_t'][int(np.argmax(minfo['glue_gr']))]:.2f}s")
     row = []
     worst_ui, worst_at = 0.0, '-'
-    hits = [c['t'] for c in timing['cues'] if c['type'] in ('hit_cut', 'impact_big', 'impact_drop', 'impact_outro')]
+    hits = [c['t'] for c in timing['cues'] if c['type'] in HIT_TYPES]
     for c in timing['cues']:
         if c['type'] in FX.TRANSIENT_TYPES:
             s = ns(c['t'])
@@ -313,7 +497,7 @@ def low_end_alignment(timing, tracks, kick_trig, sfx, w):
     lps = zp(np.mean(sfx, axis=0), 'lowpass', 160.0, 4)
     rows = []
     for i, c in enumerate(timing['cues']):
-        if c['type'] not in ('impact_drop', 'impact_big', 'impact_outro', 'hit_cut'):
+        if c['type'] not in HIT_TYPES:
             continue
         s = ns(c['t'])
         if not any(abs(kt - s) <= ns(0.03) for kt in kick_trig):
@@ -342,7 +526,8 @@ def section_spectra(timing, mix, w):
     w('')
 
 
-def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fast, logs, binfo=None):
+def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fast, logs, binfo=None,
+            outdir=HERE, aac=None):
     binfo = binfo or {}
     notes = binfo.get('notes', {})
     soft = binfo.get('soft_onset', set())
@@ -352,7 +537,7 @@ def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fas
     w = L.append
     w('SOL Sniper reel: soundtrack analysis (generated by audio/build_audio.py)')
     w('=' * 78)
-    w(f"file: audio/soundtrack.wav  {info['rate']} Hz, {info['channels']} ch, {8 * info['sampwidth']}-bit PCM, "
+    w(f"file: {os.path.relpath(p_mix, ROOT)}  {info['rate']} Hz, {info['channels']} ch, {8 * info['sampwidth']}-bit PCM, "
       f"{info['frames']} samples = {info['frames'] / info['rate']:.6f} s")
     w(f"spec: 720000 samples -> {'OK' if info['frames'] == 720000 and info['rate'] == 48000 else 'FAIL'}")
     w('')
@@ -366,18 +551,38 @@ def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fas
     w(f'  sample peak:                 {sp:.2f} dBFS; samples at full scale: {int(np.sum(np.abs(mix) >= 0.9999))}')
     ff = ffmpeg_ebur128(p_mix) if use_ffmpeg else None
     if ff:
-        w(f"  ffmpeg ebur128:              I = {ff['I']} LUFS, LRA = {ff['LRA']} LU, true peak = {ff['TP']} dBFS")
-        with tempfile.TemporaryDirectory() as td:  # same AAC settings as scripts/encode.py
-            m4a = os.path.join(td, 'rt.m4a')
-            subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', p_mix, '-c:a', 'aac', '-b:a', '320k',
-                            '-ar', '48000', m4a], check=False)
-            fa = ffmpeg_ebur128(m4a) if os.path.exists(m4a) else None
-        if fa:
-            w(f"  AAC 320k round trip:         I = {fa['I']} LUFS, true peak = {fa['TP']} dBFS")
-    w(f"  master: pre-gain {minfo['gain_db']:+.2f} dB, glue comp max GR {minfo['glue_gr_db']:.2f} dB, "
-      f"limiter max GR {minfo['limiter_gr_db']:.2f} dB")
+        w(f"  ffmpeg ebur128 (WAV):        I = {ff['I']} LUFS, LRA = {ff['LRA']} LU, true peak = {ff['TP']} dBFS")
+    w(f"  master: make-up gain {minfo['gain_db']:+.2f} dB, glue comp max GR {minfo['glue_gr_db']:.2f} dB, "
+      f"limiter max GR {minfo['limiter_gr_db']:.2f} dB (WAV ceiling {minfo.get('ceiling', TP_CEILING):.1f} dBTP)")
     dc = np.mean(mix, axis=1)
     w(f'  DC offset: L {dc[0]:+.2e}  R {dc[1]:+.2e}')
+    w('')
+    w('AAC DELIVERY (as scripts/encode.py muxes it: ffmpeg native AAC-LC 320k, 48 kHz, into the MP4)')
+    if use_ffmpeg and shutil.which('ffmpeg'):
+        with tempfile.TemporaryDirectory() as td:
+            dec, fm, md5_mp4 = aac_roundtrip(p_mix, td, mux=True)  # the delivered file's own bytes
+            _, _, md5_m4a = aac_roundtrip(p_mix, td, mux=False)
+        tpa = MS.true_peak(dec)
+        ok = fm['TP'] is not None and fm['TP'] <= -1.2 and tpa <= -1.2
+        w(f"  MP4 replica, ffmpeg ebur128: I = {fm['I']} LUFS, true peak = {fm['TP']} dBTP   "
+          f"(spec <= -1.0, target <= -1.2) -> {'OK' if ok else 'FAIL'}")
+        w(f'  decoded AAC, own 4x meter:   true peak {tpa:.2f} dBTP, sample peak '
+          f'{20 * np.log10(np.max(np.abs(dec))):.2f} dBFS, integrated {MS.integrated_lufs(dec):.2f} LUFS')
+        w(f'  WAV -> AAC overshoot {tpa - tp:+.2f} dB; MP4 audio bit-identical to the audio-only encode the '
+          f"guard measures: {'yes' if md5_mp4 == md5_m4a else 'NO'}")
+        g = minfo.get('guard_db')
+        if aac:
+            w(f"  delivery guard: {aac['rounds']} master pass(es), AAC target {AAC_TP_TARGET:.1f} dBTP")
+        if g is not None and np.any(g > 0.005):
+            on = np.concatenate([[0], (g > 0.005).astype(int), [0]])
+            st, en = np.flatnonzero(np.diff(on) == 1), np.flatnonzero(np.diff(on) == -1)
+            w('  guard gain dips (post-limiter, smooth): ' + ', '.join(
+                f'{(a + int(np.argmax(g[a:b]))) / SR:.3f}s -{g[a:b].max():.2f} dB over {(b - a) / SR * 1000:.0f} ms'
+                for a, b in zip(st, en)))
+        else:
+            w('  guard gain dips: none needed')
+    else:
+        w('  skipped (--no-ffmpeg or no ffmpeg): the AAC delivery true peak is NOT verified')
     w('')
     w('START / END')
     first = mix[:, :ns(0.01)]
@@ -385,10 +590,31 @@ def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fas
       f'{20 * np.log10(np.sqrt(np.mean(first ** 2)) + 1e-12):.1f} dBFS (impact lands at sample 0)')
     pk5 = 20 * np.log10(np.max(np.abs(mix[:, :ns(0.005)])) + 1e-12)
     w(f'  peak of first 5 ms: {pk5:.1f} dBFS')
-    last = mix[:, -ns(0.05):]
-    w(f'  last 50 ms: RMS {20 * np.log10(np.sqrt(np.mean(last ** 2)) + 1e-12):.1f} dBFS, peak '
-      f'{20 * np.log10(np.max(np.abs(last)) + 1e-12):.1f} dBFS; last sample L {mix[0, -1]:+.1e} R {mix[1, -1]:+.1e}')
-    w(f'  last 10 ms peak: {20 * np.log10(np.max(np.abs(mix[:, -ns(0.01):])) + 1e-12):.1f} dBFS')
+    rms_db = lambda a, b: 20 * np.log10(np.sqrt(np.mean(mix[:, a:b] ** 2)) + 1e-12)
+    T_end = N / SR
+    w('  outro, 50 ms RMS (dBFS): ' + '  '.join(
+        f'{x:.2f} {rms_db(ns(x), ns(x + 0.05)):.1f}' for x in np.arange(T_end - 0.70, T_end - 0.01, 0.05)))
+    t_scan = np.arange(ns(T_end - 2.0), N - ns(0.05), ns(0.005))
+    below = [i for i in t_scan if rms_db(i, i + ns(0.05)) < -36.0]
+    t_below = below[0] / SR if below else T_end
+    hold = rms_db(ns(T_end - FADE_OUT - 0.05), ns(T_end - FADE_OUT))
+    ref = rms_db(ns(T_end - 0.60), ns(T_end - FADE_OUT - 0.05))
+    w(f'  held to the fade: {T_end - FADE_OUT - 0.05:.2f}-{T_end - FADE_OUT:.2f}s at {hold:.1f} dBFS ({hold - ref:+.1f} dB vs '
+      f'{T_end - 0.6:.2f}-{T_end - FADE_OUT - 0.05:.2f}s); first 50 ms window below -36 dBFS starts at {t_below:.3f}s '
+      f"(want >= {T_end - FADE_OUT:.2f}) -> {'OK' if t_below >= T_end - FADE_OUT - 1e-6 else 'CHECK'}")
+    nz = int(np.sum(np.all(mix[:, ::-1] == 0.0, axis=0).cumprod()))
+    w(f'  end fade {T_end - FADE_OUT:.3f} -> {T_end:.3f}s (raised cosine); last 10 ms peak '
+      f'{20 * np.log10(np.max(np.abs(mix[:, -ns(0.01):])) + 1e-12):.1f} dBFS; last sample L {mix[0, -1]:+.1e} '
+      f"R {mix[1, -1]:+.1e} ({nz} trailing all-zero sample(s)) -> {'OK' if nz >= 1 else 'FAIL'}")
+    for c in timing['cues']:
+        if c['type'] == 'click_final':
+            s0 = ns(c['t'])
+            pre_, at_ = rms_db(s0 - ns(0.06), s0 - ns(0.01)), rms_db(s0, s0 + ns(0.05))
+            tm, lm = MS.momentary(mix)
+            l_pre = float(np.interp(c['t'] - 0.02, tm, lm))
+            l_at = float(lm[(tm > c['t']) & (tm <= c['t'] + 0.45)].max())
+            w(f"  click_final@{c['t']:.3f}: 50 ms RMS {pre_:.1f} -> {at_:.1f} dBFS ({at_ - pre_:+.1f} dB); "
+              f'momentary loudness {l_pre:.1f} -> max {l_at:.1f} LUFS ({l_at - l_pre:+.1f} LU)')
     w('')
 
     # sections
@@ -402,20 +628,26 @@ def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fas
 
     # onsets
     cues = timing['cues']
-    on_sfx, _ = R.detect_onsets(sfx, thresh_db=8.0, floor_db=-70.0)
+    # stem onsets: the SFX stem without the dry END_ALIGNED sounds (a whip at full level right up to
+    # a hit leaves no level jump for an energy-ratio detector; those have their own check below)
+    sfx_on = sfx - binfo['ea_dry'] if 'ea_dry' in binfo else sfx
+    on_sfx, _ = R.detect_onsets(sfx_on, thresh_db=8.0, floor_db=-70.0)
     on_mix_b, _ = R.detect_onsets(mix, thresh_db=6.0, floor_db=-60.0, min_gap=0.006)
     on_mix_h, _ = R.detect_onsets(mix, thresh_db=6.0, floor_db=-66.0, hp_f=2500.0, min_gap=0.006)
     on_mix = np.unique(np.concatenate([on_mix_b, on_mix_h]))
     is_tr = lambda i, c: c['type'] in FX.TRANSIENT_TYPES and i not in soft
     trans = [c for i, c in enumerate(cues) if is_tr(i, c)]
     w('CUE ALIGNMENT (blind energy-ratio onset detector, sample resolution; deviation = detected - cue)')
-    w(f'  detected onsets: sfx stem {len(on_sfx)}, final mix {len(on_mix)} (broadband + >2.5 kHz band)')
+    w(f'  detected onsets: sfx stem {len(on_sfx)} (without the dry riser/swell/whip layers), final mix {len(on_mix)} '
+      f'(broadband + >2.5 kHz band)')
+    ea_ends = [ns(c['t']) for c in cues if c['type'] in FX.END_ALIGNED and c['type'] == 'whip']
+    masked = 0
     w('  t (s)    type           gain   sfx stem dev (ms)   final mix dev (ms)   SFX/music: K-wtd  best 1/3-oct band'
       '      render notes')
     rows = []
     low_ui = []
     devs_s, devs_m = [], []
-    crit = ('impact_big', 'impact_drop', 'impact_outro', 'hit_cut', 'click')
+    crit = ('impact_big', 'impact_drop', 'impact_outro', 'hit_cut', 'punch', 'click', 'click_final')
     crit_s, crit_m = [], []
     for i, c in enumerate(cues):
         typ = c['type']
@@ -425,18 +657,26 @@ def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fas
         a = ns(c['t'])
         if typ in ('riser', 'reverse_swell'):
             a0, a1 = a - ns(min(c.get('dur', 0.5), 0.25)), a  # the climax
+        elif typ == 'whip':
+            a0, a1 = a - ns(min(c.get('dur', 0.15), 0.06)), a  # its loudest part, right before the stop
         elif typ in ('whoosh_long', 'zoom_through'):
             a0, a1 = a, a + ns(c.get('dur', 0.4))
         elif typ in ('whoosh_fast', 'whoosh_rise', 'text_reveal'):
             a0, a1 = a, a + ns(0.25)
         elif typ in ('click', 'tap_soft', 'tick'):
             a0, a1 = a, a + ns(0.02)
+        elif typ == 'click_final':
+            a0, a1 = a, a + ns(0.03)
         else:
             a0, a1 = a, a + ns(0.08)
         ks, km = MS.kweight(sfx[:, a0:a1]), MS.kweight(music[:, a0:a1])
         snr = 10 * np.log10((np.mean(ks ** 2) + 1e-20) / (np.mean(km ** 2) + 1e-20))
         bb, bf = R.best_band_snr(sfx[:, a0:a1], music[:, a0:a1])
         f = lambda d: f'{d * 1000:+8.2f}' if d is not None else ('     n/a' if tr else '       -')
+        on_whip = tr and dm is None and any(abs(e - a) <= ns(0.002) for e in ea_ends)
+        if on_whip:
+            masked += 1
+            notes[i] = '; '.join(x for x in (notes.get(i, ''), 'mix: lands on a whip stop, no level jump to detect') if x)
         snr_s = f'{snr:+11.1f}' if snr < 40 else '       >+40'
         bb_s = f'{bb:+6.1f}' if bb < 40 else '  >+40'
         flag = ''
@@ -453,21 +693,23 @@ def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fas
                 devs_m.append(abs(dm))
             if typ in crit:
                 crit_s.append(abs(ds) if ds is not None else np.inf)
-                crit_m.append(abs(dm) if dm is not None else np.inf)
+                if not on_whip:
+                    crit_m.append(abs(dm) if dm is not None else np.inf)
     w(f'  transient cues: {len(trans)} (+{len(soft)} rendered without a transient by design); '
-      f'matched in sfx stem {len(devs_s)}, in final mix {len(devs_m)}')
+      f'matched in sfx stem {len(devs_s)}, in final mix {len(devs_m)}'
+      + (f' ({masked} landing on a whip stop: no level jump in the mix, see the stem)' if masked else ''))
     w("  UI audibility (best 1/3-octave band over the music, want >= +6 dB): "
       + ('all OK' if not low_ui else 'LOW: ' + ', '.join(low_ui)))
     if devs_s:
         w(f'  sfx stem  |dev|: max {max(devs_s) * 1000:.2f} ms, mean {np.mean(devs_s) * 1000:.2f} ms')
     if crit_s:
         w(f"  click/impact/hit cues (sfx stem): max |dev| {max(crit_s) * 1000:.2f} ms -> "
-          f"{'PASS (< 5 ms)' if max(crit_s) < 0.005 else 'FAIL'}")
+          f"{'PASS (< 2 ms)' if max(crit_s) < 0.002 else 'FAIL'}")
     if devs_m:
         w(f'  final mix |dev|: max {max(devs_m) * 1000:.2f} ms, mean {np.mean(devs_m) * 1000:.2f} ms')
     if crit_m:
         w(f"  click/impact/hit cues (final mix): max |dev| {max(crit_m) * 1000:.2f} ms -> "
-          f"{'PASS (< 5 ms)' if max(crit_m) < 0.005 else 'FAIL'}")
+          f"{'PASS (< 2 ms)' if max(crit_m) < 0.002 else 'FAIL'}")
     # music grid
     on_kick, _ = R.detect_onsets(tracks['kick'], thresh_db=8.0, floor_db=-70.0, hp_f=30.0)
     kd = np.abs(np.array([(on_kick[int(np.argmin(np.abs(on_kick - s)))] - s) / SR for s in kick_trig]))
@@ -490,6 +732,27 @@ def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fas
       f'max {gd.max() * 1000:.2f} ms'
       + (f"  ({len(spurious)} detector hit(s) without an instrument onset ignored: "
          f"{', '.join(f'{v / SR:.3f}s' for v in spurious)})" if len(spurious) else ''))
+
+    # end-aligned cues
+    spans = binfo.get('spans', {})
+    ea = [(i, c) for i, c in enumerate(cues) if c['type'] in FX.END_ALIGNED and i in spans]
+    if ea:
+        w('  END-ALIGNED cues (isolated dry render; sound must end ON the cue sample; stop = time from its last')
+        w('  -6 dB point re its loudest 1 ms to silence; level re its loudest 10 ms over its last 10 ms):')
+        worst = 0.0
+        for i, c in ea:
+            a, b, iso = spans[i]
+            m = np.max(np.abs(iso), axis=0)
+            last = int(np.flatnonzero(m > m.max() * 1e-4)[-1])
+            dev = (a + last + 1 - ns(c['t'])) / SR
+            worst = max(worst, abs(dev))
+            e1 = np.sqrt(uniform_filter1d(np.mean(iso ** 2, axis=0), ns(0.001)))
+            stop = (last - int(np.flatnonzero(e1 >= e1.max() * 0.5)[-1])) / SR
+            e10 = np.sqrt(uniform_filter1d(np.mean(iso ** 2, axis=0), ns(0.01)))
+            tail = 20 * np.log10(np.sqrt(np.mean(iso[:, max(last - ns(0.01), 0):last + 1] ** 2)) / e10.max())
+            w(f"    {c['t']:6.3f} {c['type']:13s} dur {c.get('dur', 0):.3f}: starts {(a - ns(c['t'])) / SR * 1000:+8.1f} ms, "
+              f'ends {dev * 1000:+.2f} ms re cue; stop {stop * 1000:.1f} ms; last 10 ms {tail:+.1f} dB')
+        w(f"  end-aligned |dev| max {worst * 1000:.2f} ms -> {'PASS (< 2 ms)' if worst < 0.002 else 'FAIL'}")
     w('')
 
     # discontinuity / click scan
@@ -557,19 +820,19 @@ def analyse(timing, p_mix, music, sfx, tracks, kick_trig, minfo, use_ffmpeg, fas
         w('  ' + s.strip())
 
     txt = '\n'.join(L) + '\n'
-    open(os.path.join(HERE, 'analysis.txt'), 'w').write(txt)
+    open(os.path.join(outdir, 'analysis.txt'), 'w').write(txt)
     print(txt)
 
     if not fast:
         secs = timing['sections']
-        R.spectrogram_png(mix, os.path.join(HERE, 'spectrogram.png'),
+        R.spectrogram_png(mix, os.path.join(outdir, 'spectrogram.png'),
                           'Final mix, log-frequency spectrogram (90 dB range); markers: red impact, orange hit, cyan UI, violet whoosh/riser',
                           cues, secs)
-        R.spectrogram_png(mix, os.path.join(HERE, 'spectrogram_low.png'),
+        R.spectrogram_png(mix, os.path.join(outdir, 'spectrogram_low.png'),
                           'Final mix, 20-400 Hz detail (nfft 16384): kick / sub / bass cleanliness',
                           cues, secs, fmin=20.0, fmax=400.0, nfft=16384, hop=480, H=600, rng_db=70.0)
-        R.waveform_png(os.path.join(HERE, 'waveform.png'), mix, music, sfx, cues, secs)
-        R.onset_zoom_png(os.path.join(HERE, 'onsets.png'), sfx, mix, rows)
+        R.waveform_png(os.path.join(outdir, 'waveform.png'), mix, music, sfx, cues, secs)
+        R.onset_zoom_png(os.path.join(outdir, 'onsets.png'), sfx, mix, rows)
 
 
 if __name__ == '__main__':

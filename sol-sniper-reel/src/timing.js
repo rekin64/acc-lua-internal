@@ -100,7 +100,7 @@ export const CUES = [
   { t: s(beat(26)), type: 'impact_outro' },
   { t: s(beat(27.2)), type: 'text_reveal', gain: -8 },      // headline returns
   { t: s(beat(28.25)), type: 'whoosh_rise', gain: -8 },     // CTA springs in
-  { t: s(beat(29.6)), type: 'tap_soft', gain: -8 },         // cursor hover
+  { t: s(beat(29.6)), type: 'tap_soft', gain: -6 },         // cursor hover
   { t: s(beat(30)), type: 'click_final' },                  // final click + payoff
 ];
 
@@ -112,8 +112,9 @@ export const FAST_MOTION = [
   [2.76, 3.26, 32],   // glide down to the hero
   [3.83, 4.12, 48],   // zoom-through the CTA and landing in the app
   [4.44, 4.77, 24],   // punch onto AI 94
-  [5.10, 5.60, 16],   // breathe out for the notification
+  [5.20, 6.05, 16],   // settle onto the GLINT row
   [6.10, 6.30, 48],   // whip pan landing on the drop
+  [6.33, 6.74, 24],   // drift toward the Sim PnL chip
   [6.73, 7.20, 24],   // cursor-follow punch-ins (trade panel)
   [7.40, 7.98, 24],   // breathe out + pan to positions
   [8.10, 8.70, 24],   // punch to GLINT / FROGO rows
