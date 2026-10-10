@@ -9,15 +9,16 @@ html, body { margin: 0; background: #000; overflow: hidden; }
 .sweep { position: absolute; left: 0; top: 0; width: 1206px; height: 2622px; mix-blend-mode: screen; opacity: 0;
   -webkit-mask-image: url('../../assets/intro/phone.png'); mask-image: url('../../assets/intro/phone.png');
   -webkit-mask-size: 1206px 2622px; mask-size: 1206px 2622px;
-  background: linear-gradient(115deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 60%);
-  background-size: 300% 100%; }
+  background: linear-gradient(115deg, rgba(255,255,255,0) 47%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 53%);
+  background-size: 500% 100%; }
 .shade { position: absolute; inset: 0; background: #000; pointer-events: none; }
 .vignette { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 85% 70% at 50% 58%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6) 100%); }
-.grain { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: 0.11;
+.grain { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: soft-light; opacity: 0.22;
   background-size: 1080px 1920px; }
 .hook { position: absolute; left: 0; right: 0; top: 0; text-align: center; transform-origin: 540px 0; }
-.hook .ln { display: block; font-weight: 800; font-size: 132px; line-height: 1.0; letter-spacing: -0.04em; color: #FFFFFF;
+.hook .ln { display: block; font-weight: 800; font-size: 140px; line-height: 0.9; letter-spacing: -0.05em; color: #FFFFFF;
   white-space: nowrap; transform-origin: 50% 60%;
-  text-shadow: 0 0 2px rgba(255,255,255,0.35), 0 0 26px rgba(255,255,255,0.22), 0 0 70px rgba(190,170,255,0.10); }
-.hook .ln + .ln { margin-top: 8px; }
+  text-shadow: 0 0 2px rgba(255,255,255,0.35), 0 0 22px rgba(255,255,255,0.26), 0 0 56px rgba(255,255,255,0.12); }
+.hook .ln:first-child { font-size: 158px; }
+.hook .dots { letter-spacing: -0.1em; }

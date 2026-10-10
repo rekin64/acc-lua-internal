@@ -15,8 +15,7 @@ const CX = 540, CY = 960;
 const Z0 = 1080 / 1206;            // photo width fills the frame
 const A = '../../assets/intro/';
 const F0 = { x: 603, y: 1249 };    // the reference composition (phone below the type)
-const F1 = { x: 588, y: 1262 };    // after the slow push
-const TARGET = { x: 334, y: 1222 }; // "$815,122.73" + "+$2,600.03" on the screen
+const TARGET = { x: 367, y: 1258 }; // "$815,122.73": lands where the reel's "MEMECOIN" title appears (match cut)
 const PULSES = CUES.filter((c) => c.type === 'pulse').map((c) => c.t);
 const fl = (t) => Math.floor(t * FPS + 1e-6) / FPS;
 
@@ -29,14 +28,12 @@ function dolly(p, a, b) {
   const sx = lerp((b.x - a.x) * a.z, 0, p), sy = lerp((b.y - a.y) * a.z, 0, p);
   return { x: b.x - sx / z, y: b.y - sy / z, z };
 }
+// One continuous move with no stops: a steady slow push, then an elegant speed ramp
+// into the balance, still accelerating at the cut (velocity only ever increases).
 function camera(t) {
-  if (t < 2.8) {
-    const p = ease.outSine(prog(t, 1.3, 2.8));
-    return dolly(p, { ...F0, z: Z0 * 0.98 }, { ...F1, z: Z0 * 1.08 });
-  }
-  // one accelerating move from the composition into the screen: slow start, speed ramp, plunge
-  const p = Math.pow(prog(t, 2.8, DURATION), 5);
-  return dolly(p, { ...F1, z: Z0 * 1.08 }, { ...TARGET, z: Z0 * 6.6 });
+  const u = prog(t, 1.3, DURATION);
+  const p = 0.25 * u + 0.75 * Math.pow(u, 7);
+  return dolly(p, { ...F0, z: Z0 * 0.98 }, { ...TARGET, z: Z0 * 2.85 });
 }
 const pulseAt = (t) => PULSES.reduce((m, p) => Math.max(m, t >= p ? Math.exp(-(t - p) / 0.16) : 0), 0);
 
@@ -46,7 +43,7 @@ const ph = h(`<div class="layer"><img src="${A}phone.png"><img class="screenfx g
 const glow = ph.querySelector('.glow'), profit = ph.querySelector('.profit'), sweep = ph.querySelector('.sweep');
 const shade = h(`<div class="shade"></div>`);
 const vignette = h(`<div class="vignette"></div>`);
-const hook = h(`<div class="hook"><span class="ln">Wait...</span><span class="ln">is this legal?</span></div>`);
+const hook = h(`<div class="hook"><span class="ln">Wait<span class="dots">...</span></span><span class="ln">is this legal?</span></div>`);
 const lines = [...hook.querySelectorAll('.ln')];
 const grain = h(`<div class="grain"></div>`);
 stage.append(bg, ph, shade, vignette, hook, grain);
@@ -60,36 +57,40 @@ function render(t) {
 
   // ---- exposure: black, then the phone rises out of the dark
   const lightUp = ease.inOutSine(prog(t, 1.3, 1.95));
-  const endDip = ease.inQuad(prog(t, DURATION - 0.1, DURATION)) * 0.35;
-  css(shade, 'opacity', Math.max(1 - lightUp, endDip).toFixed(3));
+  css(shade, 'opacity', (1 - lightUp).toFixed(3)); // hard cut on the beat at 5.0 (no dip)
   css(vignette, 'opacity', (t < 1.3 ? 0 : 1).toString());
 
   // ---- screen bloom + profit glow on the pulses
   const pulse = pulseAt(t);
   css(glow, 'opacity', (lerp(0, 0.32, lightUp) + 0.14 * pulse + 0.12 * ease.inQuad(prog(t, 2.8, DURATION))).toFixed(3));
   const pr = ease.inOutSine(prog(t, 2.6, 3.0));
-  css(profit, 'opacity', (pr * (0.38 + 0.5 * pulse)).toFixed(3));
+  css(profit, 'opacity', (pr * (0.45 + 0.35 * pulse)).toFixed(3));
   // light sweeps across the glass: once as the phone appears, once as the build starts
-  const s1 = prog(t, 1.42, 2.02), s2 = prog(t, 3.05, 3.6);
+  const s1 = prog(t, 1.95, 2.55), s2 = prog(t, 3.44, 3.8); // after the fade-up; second one rides the 3.56 pulse
   const sw = s1 > 0 && s1 < 1 ? s1 : s2;
-  css(sweep, 'opacity', (s1 > 0 && s1 < 1 ? 0.24 * Math.sin(Math.PI * s1) : s2 > 0 && s2 < 1 ? 0.16 * Math.sin(Math.PI * s2) : 0).toFixed(3));
+  css(sweep, 'opacity', (s1 > 0 && s1 < 1 ? 0.14 * Math.sin(Math.PI * s1) : s2 > 0 && s2 < 1 ? 0.1 * Math.sin(Math.PI * s2) : 0).toFixed(3));
   css(sweep, 'backgroundPosition', `${(100 - 100 * ease.inOutSine(sw)).toFixed(2)}% 0`);
 
-  // ---- type: punch in, glide up over the phone, fly past the camera into the zoom
-  if (!hook.__h) hook.__h = hook.offsetHeight;
-  const up = ease.glide(prog(t, 1.3, 1.85));
-  const cyText = lerp(lerp(935, 520, up), 486, ease.inOutSine(prog(t, 1.85, 4.2)));
-  const out = ease.inCubic(prog(t, 4.2, 4.52));
-  const sc = lerp(lerp(1, 0.9, up), 0.93, ease.inOutSine(prog(t, 1.85, 4.2))) * lerp(1, 1.45, out);
-  css(hook, 'transform', `translate3d(0, ${(cyText - (hook.__h * sc) / 2).toFixed(2)}px, 0) scale(${sc.toFixed(4)})`);
+  // ---- type: punch in on the accents, slow drift, glide up over the phone, fly past the camera
+  if (!hook.__h) { hook.__h = hook.offsetHeight; hook.__h2 = lines[1].offsetHeight; }
+  const up = ease.easy(prog(t, 1.2, 1.95));
+  let cy = lerp(lerp(935, 470, up), 452, ease.inOutSine(prog(t, 1.95, 4.2)));
+  cy += (hook.__h2 / 2) * (1 - ease.outCubic(prog(t, 0.8, 1.0))) * (t < 1.2 ? 1 : 0); // "Wait..." centred while alone
+  let sc = lerp(1, 1.025, prog(t, 0.4, 1.3)) * (1 - up) + up * lerp(1, 1.02, ease.inOutSine(prog(t, 1.95, 4.2)));
+  // from 4.2 the type is a layer nearer the camera than the phone: it accelerates out through the top
+  const k = t > 4.2 ? Math.pow(camera(t).z / camera(4.2).z, 1.4) : 1;
+  cy = 960 + (cy - 960) * k;
+  sc *= k;
+  const out = ease.inQuad(prog(t, 4.2, 4.42));
+  css(hook, 'transform', `translate3d(0, ${(cy - (hook.__h * sc) / 2).toFixed(2)}px, 0) scale(${sc.toFixed(4)})`);
   css(hook, 'opacity', (1 - out).toFixed(3));
-  css(hook, 'filter', out > 0.01 ? `blur(${(out * 12).toFixed(2)}px)` : 'none');
-  [[0.4, 1.38], [0.8, 1.26]].forEach(([t0, s0], i) => {
-    const pin = ease.outExpo(prog(t, t0, t0 + 0.24));
-    const b = lerp(14, 0, ease.outCubic(prog(t, t0, t0 + 0.16)));
-    css(lines[i], 'opacity', clamp(prog(t, t0, t0 + 0.05)).toFixed(3));
+  css(hook, 'filter', out > 0.01 ? `blur(${(out * 10).toFixed(2)}px)` : 'none');
+  [[0.4, 1.12], [0.8, 1.08]].forEach(([t0, s0], i) => {
+    const pin = ease.outCubic(prog(t, t0, t0 + 0.32));
+    const b = lerp(6, 0, ease.outCubic(prog(t, t0, t0 + 0.2)));
+    css(lines[i], 'opacity', t >= t0 ? '1' : '0'); // full on the accent frame
     css(lines[i], 'transform', `scale(${lerp(s0, 1, pin).toFixed(4)})`);
-    css(lines[i], 'filter', b > 0.05 ? `blur(${b.toFixed(2)}px)` : 'none');
+    css(lines[i], 'filter', b > 0.05 && t >= t0 ? `blur(${b.toFixed(2)}px)` : 'none');
   });
 
   // ---- film grain (changes every frame, constant within a frame's sub-samples)

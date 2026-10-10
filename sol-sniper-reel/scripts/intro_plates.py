@@ -14,6 +14,7 @@ Run: python3 -I scripts/intro_plates.py
 import os
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+from scipy.ndimage import maximum_filter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'assets/source/intro-reference.png')
@@ -41,9 +42,9 @@ def fill_band(arr, y0, y1, x0, x1, src_mask):
 # surrounding (text-free) background, so the fill is smooth and matches the local tone
 txt = (lum > 6).astype(np.float32)
 txt[:560] = 0; txt[935:] = 0
-tm = Image.fromarray((txt * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(41)).filter(ImageFilter.GaussianBlur(14))
+tm = Image.fromarray((maximum_filter(txt, size=81) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(30))
 tmask = np.clip(np.asarray(tm).astype(np.float32) / 255.0 * 1.8, 0, 1)
-keep = 1.0 - np.clip(np.asarray(Image.fromarray((txt * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(61))).astype(np.float32) / 255.0, 0, 1)
+keep = 1.0 - maximum_filter(txt, size=121)
 def blur(x, r):
     return np.asarray(Image.fromarray(np.clip(x, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(r))).astype(np.float32)
 num = np.dstack([blur(a[..., c] * keep * 4, 60) for c in range(3)])
@@ -101,6 +102,15 @@ R, G, B = cl[..., 0], cl[..., 1], cl[..., 2]
 green = ((G > 110) & (G > R + 35) & (G > B + 25)).astype(np.float32)
 pm = np.zeros_like(green); pm[1228:1290, 175:425] = 1
 green *= pm
-pg = np.dstack([np.full_like(green, 70), np.full_like(green, 255), np.full_like(green, 120), green * 255]).astype(np.uint8)
-Image.fromarray(pg, 'RGBA').filter(ImageFilter.GaussianBlur(9)).save(os.path.join(OUT, 'profit.png'), optimize=True)
+# halo only: nothing glows over the figures themselves, so the dark glyphs in the chip stay readable
+gm = Image.fromarray((green * 255).astype(np.uint8))
+solid = np.asarray(gm.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.MinFilter(9))).astype(np.float32) / 255.0
+halo = np.asarray(gm.filter(ImageFilter.GaussianBlur(9))).astype(np.float32) / 255.0 * (1.0 - solid)
+pg = np.dstack([np.full_like(green, 70), np.full_like(green, 255), np.full_like(green, 120), np.clip(halo * 1.6, 0, 1) * 255]).astype(np.uint8)
+Image.fromarray(pg, 'RGBA').save(os.path.join(OUT, 'profit.png'), optimize=True)
+
+# film grain at native output resolution (soft-light keeps true blacks black)
+for i in range(4):
+    gr = np.clip(128 + np.random.default_rng(100 + i).normal(0, 20, (1920, 1080)), 0, 255).astype(np.uint8)
+    Image.fromarray(gr, 'L').save(os.path.join(OUT, f'grain_{i}.png'), optimize=True)
 print('plates written to', OUT, 'size', W, H)

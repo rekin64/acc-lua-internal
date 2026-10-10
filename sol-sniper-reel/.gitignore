@@ -5,3 +5,4 @@ audio/stems/
 audio/*.png
 audio/sndkit/__pycache__/
 audio/__pycache__/
+audio/sndkit/__pycache__/

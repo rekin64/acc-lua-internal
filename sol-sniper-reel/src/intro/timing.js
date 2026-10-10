@@ -38,8 +38,9 @@ export const CUES = [
 export const FAST_MOTION = [
   [0.40, 0.62, 24], // "Wait..." punch-in
   [0.80, 1.00, 24], // "is this legal?" punch-in
-  [1.30, 1.85, 16], // text glides up, phone push-in starts
+  [1.20, 1.95, 16], // text glides up, phone push-in starts
   [3.60, 4.20, 16], // speed ramp builds
+  [4.20, 4.45, 24], // type flies past the camera
   [4.20, 5.00, 48], // zoom into the screen
 ];
 export const samplesFor = (frame, base = 4, fastMax = 48) => {
