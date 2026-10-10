@@ -99,3 +99,20 @@ export const CUES = [
   { t: s(beat(29.6)), type: 'tap_soft', gain: -8 },        // cursor hover
   { t: s(beat(30)), type: 'click' },                       // final click
 ];
+
+// Fast camera moves get extra motion-blur sub-frames (smooth streaks instead of
+// stepped copies). Everything else uses the renderer's default sample count.
+export const FAST_MOTION = [
+  [1.15, 1.80],   // title exit + site card rise
+  [1.93, 2.42],   // push to the logo
+  [3.10, 3.50],   // glide down to the hero
+  [3.83, 4.20],   // zoom-through the CTA and landing in the app
+  [6.00, 6.45],   // whip pan to the chart (on the drop)
+  [7.64, 8.00],   // pan to positions
+  [9.10, 9.50],   // pull-out to the full terminal
+  [12.30, 12.50], // push into the outro match-cut
+];
+export const samplesFor = (frame, base = 4, fast = 12) => {
+  const t = frame / FPS;
+  return FAST_MOTION.some(([a, b]) => t >= a && t < b) ? fast : base;
+};

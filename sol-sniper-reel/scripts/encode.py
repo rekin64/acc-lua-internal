@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+from multiprocessing import Pool
 
 import numpy as np
 from PIL import Image
@@ -31,7 +32,9 @@ crf = opt('crf', '16')
 audio = os.path.join(ROOT, opt('audio', 'audio/soundtrack.wav'))
 
 meta = json.load(open(os.path.join(frames_dir, 'meta.json')))
-fps, samples, total = meta['fps'], meta['samples'], meta['total']
+fps, samples = meta['fps'], meta['samples']
+first, last = meta.get('from', 0), meta.get('to', meta['total'])
+total = last - first
 W, H = 1080, 1920
 
 # sRGB <-> linear lookup tables
@@ -44,12 +47,11 @@ def to_srgb(lin):
     return np.where(lin <= 0.0031308, lin * 12.92, 1.055 * np.power(lin, 1 / 2.4) - 0.055)
 
 
-rng = np.random.default_rng(1234)
 os.makedirs(os.path.dirname(out_path), exist_ok=True)
 cmd = [
     'ffmpeg', '-y', '-loglevel', 'error',
     '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-framerate', str(fps), '-i', '-',
-    '-i', audio,
+    '-ss', f'{first / fps:.4f}', '-i', audio,
     '-map', '0:v', '-map', '1:a',
     '-vf', 'scale=in_range=full:out_range=tv:out_color_matrix=bt709,format=yuv420p',
     '-c:v', 'libx264', '-preset', 'slow', '-crf', str(crf), '-profile:v', 'high', '-level:v', '4.2',
@@ -59,25 +61,29 @@ cmd = [
     '-t', f'{total / fps:.3f}', '-movflags', '+faststart',
     out_path,
 ]
-proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-for k in range(total):
-    acc = None
-    n = 0
+def blend(k):
+    """Linear-light average of frame k's sub-frames, dithered back to 8-bit."""
+    acc, n = None, 0
     for j in range(samples):
         f = os.path.join(frames_dir, f'f{k:04d}_{j}.png')
         if not os.path.exists(f):
             continue
-        img = np.asarray(Image.open(f).convert('RGB'))
-        lin = to_lin[img]
+        lin = to_lin[np.asarray(Image.open(f).convert('RGB'))]
         acc = lin if acc is None else acc + lin
         n += 1
     if n == 0:
         raise SystemExit(f'missing frame {k}')
-    out = to_srgb(acc / n) * 255.0
-    out += rng.triangular(-0.75, 0, 0.75, size=out.shape).astype(np.float32)
-    proc.stdin.write(np.clip(np.rint(out), 0, 255).astype(np.uint8).tobytes())
-    if k % 30 == 0:
-        print(f'\rencoding {k}/{total}', end='', flush=True)
+    out = to_srgb(acc / n).astype(np.float32) * 255.0
+    out += np.random.default_rng(k).triangular(-0.75, 0, 0.75, size=out.shape).astype(np.float32)
+    return np.clip(np.rint(out), 0, 255).astype(np.uint8).tobytes()
+
+
+proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+with Pool(max(1, (os.cpu_count() or 2))) as pool:
+    for i, buf in enumerate(pool.imap(blend, range(first, last), chunksize=2)):
+        proc.stdin.write(buf)
+        if i % 30 == 0:
+            print(f'\rencoding {i}/{total}', end='', flush=True)
 proc.stdin.close()
 proc.wait()
 print(f'\nwrote {out_path}')
