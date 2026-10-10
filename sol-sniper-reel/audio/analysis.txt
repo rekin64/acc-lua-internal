@@ -4,111 +4,111 @@ file: audio/soundtrack.wav  48000 Hz, 2 ch, 24-bit PCM, 720000 samples = 15.0000
 spec: 720000 samples -> OK
 
 LOUDNESS / PEAK
-  integrated (own BS.1770-4):  -14.03 LUFS   (target -14.0)
-  loudness range:              3.2 LU
-  true peak (4x oversampled):  -2.00 dBTP  (limit -1.0)
-  sample peak:                 -2.01 dBFS; samples at full scale: 0
-  ffmpeg ebur128:              I = -14.0 LUFS, LRA = 3.2 LU, true peak = -2.0 dBFS
-  AAC 320k round trip:         I = -14.1 LUFS, true peak = -0.9 dBFS
-  master: pre-gain +4.30 dB, glue comp max GR 2.99 dB, limiter max GR 2.12 dB
-  DC offset: L +5.33e-06  R +3.55e-06
+  integrated (own BS.1770-4):  -14.01 LUFS   (target -14.0)
+  loudness range:              3.0 LU
+  true peak (4x oversampled):  -2.50 dBTP  (limit -1.0)
+  sample peak:                 -2.51 dBFS; samples at full scale: 0
+  ffmpeg ebur128:              I = -14.0 LUFS, LRA = 3.0 LU, true peak = -2.5 dBFS
+  AAC 320k round trip:         I = -14.1 LUFS, true peak = -1.7 dBFS
+  master: pre-gain +4.42 dB, glue comp max GR 3.00 dB, limiter max GR 2.59 dB
+  DC offset: L +1.83e-06  R -2.39e-06
 
 START / END
-  first sample: L -0.0038  R +0.0003;  RMS of first 10 ms: -10.1 dBFS (impact lands at sample 0)
-  peak of first 5 ms: -2.3 dBFS
-  last 50 ms: RMS -86.0 dBFS, peak -69.5 dBFS; last sample L +0.0e+00 R +0.0e+00
+  first sample: L -0.0037  R +0.0002;  RMS of first 10 ms: -10.5 dBFS (impact lands at sample 0)
+  peak of first 5 ms: -2.8 dBFS
+  last 50 ms: RMS -85.9 dBFS, peak -69.4 dBFS; last sample L +0.0e+00 R +0.0e+00
   last 10 ms peak: -116.2 dBFS
 
 SECTION LOUDNESS (ungated, K-weighted; final mix / music stem / sfx stem as written)
-  title     0.00- 1.44s   mix  -15.3   music  -27.9   sfx  -20.4 LUFS
-  reveal    1.44- 3.84s   mix  -15.1   music  -23.1   sfx  -23.9 LUFS
-  demo      3.84- 6.24s   mix  -14.7   music  -21.7   sfx  -24.5 LUFS
-  drop      6.24- 9.60s   mix  -12.3   music  -18.8   sfx  -22.5 LUFS
-  montage   9.60-12.48s   mix  -13.2   music  -19.5   sfx  -25.1 LUFS
-  outro    12.48-15.00s   mix  -16.4   music  -23.8   sfx  -25.5 LUFS
+  title     0.00- 1.44s   mix  -15.2   music  -27.9   sfx  -20.4 LUFS
+  reveal    1.44- 3.84s   mix  -15.0   music  -23.1   sfx  -23.9 LUFS
+  demo      3.84- 6.24s   mix  -14.7   music  -21.7   sfx  -24.6 LUFS
+  drop      6.24- 9.60s   mix  -12.4   music  -18.8   sfx  -22.5 LUFS
+  montage   9.60-12.48s   mix  -13.2   music  -19.6   sfx  -25.1 LUFS
+  outro    12.48-15.00s   mix  -16.3   music  -23.8   sfx  -25.6 LUFS
 
 ENERGY CURVE (momentary 400 ms loudness, final mix)
-  title    max  -12.1 LUFS @  0.20s   median  -17.1
-  reveal   max  -12.7 LUFS @  1.55s   median  -15.1
-  demo     max  -11.1 LUFS @  6.20s   median  -14.5
-  drop     max   -9.6 LUFS @  6.40s   median  -12.6
-  montage  max  -11.9 LUFS @ 11.00s   median  -13.0
-  outro    max  -12.5 LUFS @ 12.65s   median  -16.6
-  drop max vs title max +2.5 LU (want >= +2), vs montage max +2.3 LU (want >= +1) -> OK
-  build 5.28-6.00s -13.3 LUFS, pre-drop gap 6.00-6.233s -17.2 LUFS: -4.0 LU (want <= -3) -> OK
-  phone-speaker sim (HP 300 Hz / LP 12 kHz), ungated: title -19.2  reveal -17.6  demo -18.5  drop -16.3  montage -17.1  outro -19.6
+  title    max  -12.1 LUFS @  0.20s   median  -17.0
+  reveal   max  -12.6 LUFS @  1.55s   median  -14.9
+  demo     max  -11.3 LUFS @  6.20s   median  -14.4
+  drop     max   -9.9 LUFS @  6.40s   median  -12.6
+  montage  max  -11.8 LUFS @ 11.00s   median  -13.0
+  outro    max  -12.5 LUFS @ 12.65s   median  -16.5
+  drop max vs title max +2.1 LU (want >= +2), vs montage max +1.9 LU (want >= +1) -> OK
+  build 5.28-6.00s -13.3 LUFS, pre-drop gap 6.00-6.233s -17.1 LUFS: -3.8 LU (want <= -3) -> OK
+  phone-speaker sim (HP 300 Hz / LP 12 kHz), ungated: title -19.1  reveal -17.5  demo -18.5  drop -16.3  montage -17.2  outro -19.5
 
 CUE ALIGNMENT (blind energy-ratio onset detector, sample resolution; deviation = detected - cue)
-  detected onsets: sfx stem 41, final mix 258 (broadband + >2.5 kHz band)
+  detected onsets: sfx stem 41, final mix 256 (broadband + >2.5 kHz band)
   t (s)    type           gain   sfx stem dev (ms)   final mix dev (ms)   SFX/music: K-wtd  best 1/3-oct band      render notes
    0.000   impact_big      +0                +0.00                +0.00          >+40    >+40 dB @  6350 Hz      
    0.000   text_reveal     -4                    -                    -         +28.0    >+40 dB @  6350 Hz      
-   0.967   tick            -6                -0.62                -0.15          -0.8    >+40 dB @  6350 Hz      peak-capped (-12.5 dB)
+   0.967   tick            -6                -0.62                -0.15          -1.4    >+40 dB @  6350 Hz      peak-capped (-13.5 dB)
    1.300   whoosh_fast     -3                    -                    -          -1.2   +38.8 dB @  6350 Hz      
    1.433   whoosh_rise     +0                    -                    -          +1.0   +38.1 dB @  6350 Hz      
    1.433   hit_cut         -6                +0.56                +0.27          -2.9    >+40 dB @  6350 Hz      no knock (kick +6.7 ms)
    1.933   whoosh_long     +0                    -                    -          +2.5   +28.8 dB @  4000 Hz      
-   2.167   text_reveal     -8                    -                    -          +4.2   +37.7 dB @  6350 Hz      
+   2.167   text_reveal     -8                    -                    -          +4.1   +37.7 dB @  6350 Hz      
    3.133   whoosh_long     +0                    -                    -          +1.3    >+40 dB @  6350 Hz      
-   3.633   tap_soft        -6                +0.08                +0.02          -0.3   +21.4 dB @  6350 Hz      peak-capped (-12.5 dB)
-   3.833   click           +0                -0.06                -0.15          -0.9   +15.3 dB @  3175 Hz      press only (clicks < 0.25 s apart); peak-capped (-6.5 dB)
-   3.833   zoom_through    +0                    -                    -          -1.3   +26.9 dB @  6350 Hz      
+   3.633   tap_soft        -6                +0.10                +0.02          -0.3   +21.4 dB @  6350 Hz      peak-capped (-13.5 dB)
+   3.833   click           +0                -0.06                -0.15          -1.9   +14.3 dB @  3175 Hz      press only (clicks < 0.25 s apart); peak-capped (-7.5 dB)
+   3.833   zoom_through    +0                    -                    -          -1.5   +26.9 dB @  6350 Hz      
    4.333   ui_blip         +0                +0.04                +0.00          -6.0   +21.2 dB @  6350 Hz      
-   4.800   click           +0                -0.17                +0.06          -3.3   +25.1 dB @  5040 Hz      peak-capped (-6.5 dB)
-   5.100   success         -3                +0.12                +0.77          -0.6   +19.1 dB @   794 Hz      dyad F5+Ab5 over Db
-   5.267   toast           +0                +0.02                +0.04          +0.1   +21.0 dB @  6350 Hz      
+   4.800   click           +0                -0.17                -0.12          -4.3   +24.1 dB @  5040 Hz      peak-capped (-7.5 dB)
+   5.100   success         -3                +0.12                +0.77          -0.7   +19.1 dB @   794 Hz      dyad F5+Ab5 over Db
+   5.267   toast           +0                +0.02                +0.04          -0.2   +20.7 dB @  6350 Hz      peak-capped (-7.5 dB)
    6.233   riser           +0                    -                    -          +7.0   +19.5 dB @  4000 Hz      
    6.233   reverse_swell   +0                    -                    -          +7.0   +19.5 dB @  4000 Hz      
    6.233   impact_drop     +0                +0.04                +0.08          +6.7   +18.9 dB @   630 Hz      kick +6.67 ms: low layers moved +15.50 ms (+0.9 dB low end vs as-is)
    6.233   whoosh_fast     +0                    -                    -          +5.9   +16.6 dB @  3175 Hz      
-   6.733   hit_cut         -5                -0.19                +0.00          -7.3    +9.1 dB @   157 Hz      no knock (kick -13.3 ms); snap thinned (clap -13.3 ms)
-   6.733   whoosh_fast     -6                    -                    -          -5.9    +7.3 dB @  3175 Hz      
-   6.967   click           -3                +0.04                -0.04          -1.1   +15.0 dB @  3175 Hz      press only (clicks < 0.25 s apart); peak-capped (-9.5 dB)
-   7.200   click           +0                -0.19                +0.06          -6.1   +19.8 dB @  3175 Hz      press only (clicks < 0.25 s apart); peak-capped (-6.5 dB)
-   7.433   success         +0                +0.42                +1.46          -0.7   +22.0 dB @   630 Hz      single F5 over Fm9 (toast follows)
+   6.733   hit_cut         -5                -0.19                +0.00          -7.4    +8.9 dB @   157 Hz      no knock (kick -13.3 ms); snap thinned (clap -13.3 ms)
+   6.733   whoosh_fast     -6                    -                    -          -6.1    +7.4 dB @  3175 Hz      
+   6.967   click           -3                +0.04                -0.04          -2.0   +13.8 dB @  3175 Hz      press only (clicks < 0.25 s apart); peak-capped (-10.5 dB)
+   7.200   click           +0                -0.19                +0.06          -7.1   +18.9 dB @  3175 Hz      press only (clicks < 0.25 s apart); peak-capped (-7.5 dB)
+   7.433   success         +0                +0.42                +1.46          -0.7   +21.9 dB @   630 Hz      single F5 over Fm9 (toast follows)
    7.500   toast           -3                    -                    -          +0.7   +25.3 dB @  6350 Hz      swish only (success just before): no transient by design
    7.667   whoosh_long     +0                    -                    -          -3.8   +14.1 dB @  3175 Hz      
-   8.167   tick            -4                -0.23                -0.12         -13.3    +5.7 dB @  4000 Hz LOW  peak-capped (-10.5 dB)
+   8.167   tick            -4                -0.23                -0.12         -14.2    +6.1 dB @  4000 Hz      peak-capped (-11.5 dB)
    8.633   success         -4                +0.15                +6.73         -10.5   +13.8 dB @   794 Hz      dyad G5+Bb5 over Eb
-   9.133   whoosh_long     -2                    -                    -          -4.8    +6.2 dB @  2000 Hz      
+   9.133   whoosh_long     -2                    -                    -          -4.7    +6.1 dB @  2000 Hz      
    9.600   hit_cut         +0                -0.75                -0.06          -0.0   +11.0 dB @  5040 Hz      
-   9.600   whoosh_fast     -4                    -                    -          -2.1   +10.7 dB @  2520 Hz      
-  10.067   hit_cut         -2                +0.08                +0.02          -6.3    -1.7 dB @   630 Hz      no knock (kick +13.3 ms); snap thinned (clap +13.3 ms)
-  10.200   click           -4                -0.15                +0.00          -4.7   +10.6 dB @  3175 Hz      peak-capped (-10.5 dB)
+   9.600   whoosh_fast     -4                    -                    -          -2.2   +10.7 dB @  2520 Hz      
+  10.067   hit_cut         -2                +0.08                +0.02          -6.3    -1.7 dB @   794 Hz      no knock (kick +13.3 ms); snap thinned (clap +13.3 ms)
+  10.200   click           -4                -0.15                +0.00          -5.6    +9.3 dB @  3175 Hz      peak-capped (-11.5 dB)
   10.567   hit_cut         -2                -1.08                -0.08          -2.7   +14.1 dB @  6350 Hz      no knock (kick -6.7 ms)
-  10.567   whoosh_fast     -6                    -                    -          -4.4    +9.6 dB @  3175 Hz      
-  11.033   hit_cut         -2                -0.67                -0.10          -5.9    +4.2 dB @  3175 Hz      no knock (kick +6.7 ms); snap thinned (clap +6.7 ms)
-  11.033   tick            -6                -0.67                -0.10          -1.3   +13.2 dB @  2520 Hz      peak-capped (-12.5 dB)
+  10.567   whoosh_fast     -6                    -                    -          -4.4    +9.5 dB @  3175 Hz      
+  11.033   hit_cut         -2                -0.65                -0.08          -5.9    +5.1 dB @  3175 Hz      no knock (kick +6.7 ms); snap thinned (clap +6.7 ms)
+  11.033   tick            -6                -0.65                -0.08          -1.3   +14.2 dB @  2520 Hz      peak-capped (-13.5 dB)
   11.267   hit_cut         -4                -0.69                -0.10          +0.4    +8.1 dB @   125 Hz      
   11.533   hit_cut         -2                -0.25                +0.08          -2.0   +21.2 dB @   794 Hz      no knock (kick -13.3 ms)
   11.533   success         -8                -0.25                +0.08          -2.0   +21.2 dB @   794 Hz      single G5 over Cm7
   11.767   hit_cut         -4                -0.38                -0.88          +1.1   +16.3 dB @  5040 Hz      
-  12.000   hit_cut         -1                -0.48                +0.02          +2.0   +34.3 dB @   125 Hz      
+  12.000   hit_cut         -1                -0.48                +0.02          +2.0   +34.2 dB @   125 Hz      
   12.467   riser           +0                    -                    -          +2.8   +29.4 dB @  6350 Hz      
   12.467   reverse_swell   +0                    -                    -          +2.8   +29.4 dB @  6350 Hz      
   12.467   impact_outro    +0                +0.33                +0.06         +12.1   +32.8 dB @    99 Hz      
   13.433   whoosh_rise     -8                    -                    -          -6.7    +6.4 dB @  6350 Hz      
-  14.200   tap_soft        -8                -0.12                +0.25          -2.4    +3.3 dB @  1587 Hz LOW  peak-capped (-14.5 dB)
-  14.400   click           +0                +0.02                -0.04          +5.1   +13.1 dB @  1260 Hz      press only (clicks < 0.25 s apart); peak-capped (-6.5 dB)
+  14.200   tap_soft        -8                -0.12                +0.77          -2.4    +6.6 dB @  1587 Hz      peak-capped (-15.5 dB)
+  14.400   click           +0                +0.02                -0.04          +4.1   +12.1 dB @  1260 Hz      press only (clicks < 0.25 s apart); peak-capped (-7.5 dB)
   transient cues: 30 (+1 rendered without a transient by design); matched in sfx stem 30, in final mix 30
-  UI audibility (best 1/3-octave band over the music, want >= +6 dB): LOW: tick@8.167 (+5.7 dB), tap_soft@14.200 (+3.3 dB)
-  sfx stem  |dev|: max 1.08 ms, mean 0.30 ms
+  UI audibility (best 1/3-octave band over the music, want >= +6 dB): all OK
+  sfx stem  |dev|: max 1.08 ms, mean 0.29 ms
   click/impact/hit cues (sfx stem): max |dev| 1.08 ms -> PASS (< 5 ms)
-  final mix |dev|: max 6.73 ms, mean 0.40 ms
+  final mix |dev|: max 6.73 ms, mean 0.41 ms
   click/impact/hit cues (final mix): max |dev| 0.88 ms -> PASS (< 5 ms)
   music beat grid: 22 kicks placed at n*23040 samples (OK); detected kick onsets vs beat grid: max |dev| 0.21 ms
-  music stem (1.44-12.0 s): 22 detected note onsets (>10 dB); distance to the 16th-note grid: median 0.26 ms, 90th pct 0.81 ms, max 1.58 ms  (3 detector hit(s) without an instrument onset ignored: 3.316s, 5.128s, 5.280s)
+  music stem (1.44-12.0 s): 22 detected note onsets (>10 dB); distance to the 16th-note grid: median 0.22 ms, 90th pct 0.81 ms, max 1.65 ms  (3 detector hit(s) without an instrument onset ignored: 3.316s, 5.128s, 5.280s)
 
 CLICK / DISCONTINUITY SCAN (2nd-difference outliers vs local level, final mix)
   outlier clusters: 3, not at a designed transient: 0
 
 MASTER DYNAMICS (limiter gain reduction; should work on the big hits, not on UI clicks)
-  limiter max GR 2.12 dB at 6.234s (riser@6.233); glue comp max GR 2.99 dB at 0.01s
-  GR per transient cue (dB): impact_big@0.00 1.7, tick@0.97 0.0, hit_cut@1.43 0.0, tap_soft@3.63 0.0, click@3.83 0.0, ui_blip@4.33 0.0, click@4.80 0.0, success@5.10 0.0, toast@5.27 0.0, impact_drop@6.23 2.1, hit_cut@6.73 0.1, click@6.97 0.0, click@7.20 0.2, success@7.43 0.0, toast@7.50 0.0, tick@8.17 0.0, success@8.63 0.0, hit_cut@9.60 1.9, hit_cut@10.07 0.0, click@10.20 0.0, hit_cut@10.57 1.5, hit_cut@11.03 0.0, tick@11.03 0.0, hit_cut@11.27 0.0, hit_cut@11.53 1.0, success@11.53 1.0, hit_cut@11.77 0.1, hit_cut@12.00 0.9, impact_outro@12.47 1.1, tap_soft@14.20 0.0, click@14.40 0.0
-  max GR on a UI cue (not sharing its frame with a hit): 0.15 dB at click@7.200 (want < 0.5) -> OK
+  limiter max GR 2.59 dB at 6.233s (riser@6.233); glue comp max GR 3.00 dB at 0.01s
+  GR per transient cue (dB): impact_big@0.00 2.2, tick@0.97 0.0, hit_cut@1.43 0.0, tap_soft@3.63 0.0, click@3.83 0.0, ui_blip@4.33 0.0, click@4.80 0.0, success@5.10 0.0, toast@5.27 0.0, impact_drop@6.23 2.6, hit_cut@6.73 0.8, click@6.97 0.1, click@7.20 0.2, success@7.43 0.0, toast@7.50 0.0, tick@8.17 0.0, success@8.63 0.0, hit_cut@9.60 2.4, hit_cut@10.07 0.0, click@10.20 0.0, hit_cut@10.57 1.9, hit_cut@11.03 0.0, tick@11.03 0.0, hit_cut@11.27 0.0, hit_cut@11.53 1.5, success@11.53 1.5, hit_cut@11.77 0.1, hit_cut@12.00 1.4, impact_outro@12.47 1.6, tap_soft@14.20 0.0, click@14.40 0.0
+  max GR on a UI cue (not sharing its frame with a hit): 0.20 dB at click@7.200 (want < 0.5) -> OK
 
 STEREO / MONO COMPATIBILITY
-  title    L/R corr +0.62, mono sum vs stereo -0.92 dB
+  title    L/R corr +0.62, mono sum vs stereo -0.93 dB
   reveal   L/R corr +0.83, mono sum vs stereo -0.39 dB
   demo     L/R corr +0.91, mono sum vs stereo -0.20 dB
   drop     L/R corr +0.88, mono sum vs stereo -0.27 dB
@@ -127,28 +127,29 @@ LOW-END ALIGNMENT (cues within 30 ms of a kick: kick + sfx below 160 Hz over the
   hit_cut@11.533: sum +0.0 dB vs power sum
 
 SPECTRAL BALANCE (final mix, octave bands, dB rel. loudest band)
-  16Hz -34.5  31.5Hz -7.8  63Hz +0.0  125Hz -4.2  250Hz -6.0  500Hz -6.5  1000Hz -9.5  2000Hz -11.0  4000Hz -13.0  8000Hz -13.8  16000Hz -18.1
+  16Hz -34.5  31.5Hz -7.7  63Hz +0.0  125Hz -4.2  250Hz -6.0  500Hz -6.7  1000Hz -9.5  2000Hz -11.0  4000Hz -13.1  8000Hz -13.9  16000Hz -18.1
   energy below 25 Hz: 0.02% of total
-  L/R correlation: full band 0.847, below 150 Hz 0.990 (1.0 = mono-compatible low end)
-  strongest narrowband peaks 150-2000 Hz: 621 Hz +12.2 dB (Eb5-3c), 697 Hz +10.4 dB (F5-3c), 521 Hz +10.2 dB (C5-6c), 1049 Hz +8.9 dB (C6+4c), 785 Hz +8.2 dB (G5+3c)
-  strongest narrowband peaks 2000-16000 Hz: 2080 Hz +4.9 dB (C7-11c), 2490 Hz +3.5 dB (Eb7+1c), 2906 Hz +3.4 dB (Gb7-32c), 6463 Hz +3.0 dB (Ab8-48c), 3135 Hz +2.9 dB (G7-1c)
+  L/R correlation: full band 0.845, below 150 Hz 0.990 (1.0 = mono-compatible low end)
+  strongest narrowband peaks 150-2000 Hz: 621 Hz +11.3 dB (Eb5-3c), 521 Hz +11.1 dB (C5-6c), 697 Hz +10.6 dB (F5-3c), 1049 Hz +9.5 dB (C6+4c), 785 Hz +8.3 dB (G5+3c)
+  strongest narrowband peaks 2000-16000 Hz: 2080 Hz +5.9 dB (C7-11c), 2906 Hz +3.3 dB (Gb7-32c), 3123 Hz +3.2 dB (G7-7c), 2490 Hz +3.1 dB (Eb7+1c), 4166 Hz +3.0 dB (C8-8c)
 
 SECTION SPECTRA (% of section energy, mono sum)
-  title    30-80 Hz  48.8   80-200  17.6   200-400  13.1   400-900  12.1   2-5k  1.86   8-20k  2.07
-  reveal   30-80 Hz  46.2   80-200  15.9   200-400  12.2   400-900   8.6   2-5k  6.39   8-20k  1.24
-  demo     30-80 Hz  52.9   80-200  20.1   200-400   8.2   400-900   8.3   2-5k  3.87   8-20k  1.57
-  drop     30-80 Hz  45.7   80-200  25.8   200-400   8.9   400-900   9.2   2-5k  2.79   8-20k  1.58
-  montage  30-80 Hz  37.2   80-200  29.6   200-400  13.6   400-900   9.1   2-5k  3.19   8-20k  1.44
-  outro    30-80 Hz  56.0   80-200  10.2   200-400   9.2   400-900  15.7   2-5k  2.36   8-20k  0.70
+  title    30-80 Hz  48.8   80-200  17.5   200-400  13.1   400-900  12.1   2-5k  1.87   8-20k  2.11
+  reveal   30-80 Hz  46.3   80-200  16.0   200-400  12.2   400-900   8.6   2-5k  6.24   8-20k  1.23
+  demo     30-80 Hz  53.2   80-200  20.2   200-400   8.2   400-900   8.2   2-5k  3.74   8-20k  1.50
+  drop     30-80 Hz  45.8   80-200  26.1   200-400   9.0   400-900   9.0   2-5k  2.76   8-20k  1.59
+  montage  30-80 Hz  37.5   80-200  29.5   200-400  13.8   400-900   8.4   2-5k  3.23   8-20k  1.46
+  outro    30-80 Hz  56.0   80-200  10.2   200-400   9.3   400-900  15.7   2-5k  2.29   8-20k  0.72
 
 BUILD LOG
   building music + sfx
   IRs 0.3s
-  music 5.0s
-  sfx 2.5s
+  music 5.6s
+  sfx 2.4s
   mastering
-  glue comp: max GR 2.99 dB, mean GR (where active) 0.50 dB
-  iter 0: gain +4.00 dB -> -14.30 LUFS, TP -2.00 dBTP, max limiter GR 2.11 dB
-  iter 1: gain +4.30 dB -> -14.03 LUFS, TP -2.00 dBTP, max limiter GR 2.12 dB
-  wrote /home/user/acc-lua-internal/sol-sniper-reel/audio/soundtrack.wav  (10.3s)
+  glue comp: max GR 3.00 dB, mean GR (where active) 0.51 dB
+  iter 0: gain +4.00 dB -> -14.38 LUFS, TP -2.50 dBTP, max limiter GR 2.57 dB
+  iter 1: gain +4.38 dB -> -14.04 LUFS, TP -2.50 dBTP, max limiter GR 2.59 dB
+  iter 2: gain +4.42 dB -> -14.01 LUFS, TP -2.50 dBTP, max limiter GR 2.59 dB
+  wrote /home/user/acc-lua-internal/sol-sniper-reel/audio/soundtrack.wav  (12.7s)
   stems: common gain -2.19 dB (pre-master domain, before glue/limiter)

@@ -4,17 +4,21 @@ Beat b sits at t = b * 0.48 s = b * 23040 samples (exact), so every musical
 event lands on the beat grid sample-accurately.
 
 Form (beats):
-  0-3     intro     impact (SFX) + dark Fm9 pad swell, reverse swell into b3
+  0-3     intro     impact (SFX) + dark Fm9 pad swell, reverse swell into the cut at b3
   3-8     groove_a  low-passed kick on quarters, sub pulses, filtered 16th pluck arp, offbeat hats (Fm9)
-  8-11    groove_b  + light clap on 2 & 4, 8th hats, arp filter opens (Dbmaj7)
-  11-12.5 build     snare roll 8ths -> 16ths, arp/pad filter sweep up (Eb)
-  12.5-13 gap       pre-drop gap (only tails; the SFX riser / reverse swell fill it)
-  13-20   drop      kick 4/4, clap 2 & 4, open hats, sidechained rolling bass, chord stabs
-                    Fm9 (3 beats) -> Db (2) -> Eb (2)
-  20-25   montage   drop + 16th hats + shaker, snare accents on the half-beat cuts
-                    Fm9 (2) -> Db (1) -> Eb (1) -> Cm7 (1)   (harmonic rhythm accelerates with the cuts)
+  8-11    groove_b  + 8th hats, arp filter opens (Dbmaj7); its clap on 2 gives way to the UI blip there
+  11-12.5 build     snare roll 8ths -> 16ths, arp/pad filter sweep up, bus crescendo (Eb)
+  12.5-13 gap       pre-drop gap (only tails; the SFX riser / reverse swell fill it, ~4 LU under the build)
+  13-20   drop      kick 4/4, clap 2 & 4, open hats, sidechained rolling bass, chord stabs; the bus
+                    peaks (+1.5 dB) on the downbeat. Fm9 (3 beats) -> Db (2) -> Eb (2)
+  20-25   montage   drop + 16th hats + shaker; claps next to the cut hits are lighter (the hits carry
+                    the body). Fm9 (2) -> Db (1) -> Eb (1) -> Cm7 (1) (harmonic rhythm follows the cuts)
   25-26   break     everything cuts on a stab throw (delay + reverb tail)
-  26-     outro     Dbmaj9 -> Abmaj9 (at the CTA reveal), warm keys + wide pad + sub, rings out
+  26-     outro     Dbmaj9 -> Abmaj9 (at the CTA reveal) in open voicings: warm keys + wide pad + sub,
+                    the Ab pad's filter opens and a soft top line blooms (resolve bright), rings out
+
+Sidechain depth follows kick velocity. Arrangement rules that keep the frame-snapped SFX cues
+(up to 13 ms off the grid) clear of flams are in build_music().
 """
 import numpy as np
 
@@ -33,7 +37,7 @@ def bs(b):
 
 CHORDS = {
     #          bass root   pad voicing               arp tones                 stab voicing (no shared Eb4)
-    'Fm9':    dict(root=41, pad=[53, 56, 60, 63, 67], arp=[65, 68, 72, 75, 79], stab=[60, 67, 68, 75]),
+    'Fm9':    dict(root=41, pad=[53, 56, 60, 63, 67], arp=[65, 68, 72, 75, 79], stab=[60, 67, 68, 72]),
     'Db':     dict(root=37, pad=[49, 53, 56, 60, 65], arp=[65, 68, 72, 75, 77], stab=[60, 65, 68, 72]),
     'Eb':     dict(root=39, pad=[51, 55, 58, 63, 65], arp=[65, 67, 70, 75, 79], stab=[58, 63, 67, 70]),
     'Cm7':    dict(root=36, pad=[48, 55, 58, 63, 67], arp=[67, 70, 72, 75, 79], stab=[58, 63, 67, 70]),

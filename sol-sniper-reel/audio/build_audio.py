@@ -8,7 +8,8 @@ Reads audio/timing.json (bpm, sections, music markers, cues) and writes:
   audio/soundtrack.wav        48 kHz / 24-bit stereo, exactly 15.000 s (720000 samples)
   audio/stems/music.wav       pre-master music bus (24-bit)
   audio/stems/sfx.wav         pre-master SFX bus   (one shared gain: music + sfx = pre-master mix)
-  audio/analysis.txt          loudness, peaks, start/end checks, cue alignment, balance
+  audio/analysis.txt          loudness, peaks, start/end checks, energy curve, cue alignment + UI
+                              audibility, limiter activity per cue, stereo, low-end alignment, spectra
   audio/spectrogram.png       full-range log-frequency spectrogram with cue markers
   audio/spectrogram_low.png   20-400 Hz detail (low-end cleanliness)
   audio/waveform.png          mix / music / sfx waveforms + momentary loudness + cues
@@ -45,7 +46,8 @@ from sndkit import sfx as FX  # noqa: E402
 from sndkit.dsp import SR, add_at, convolve_ir, event_duck, make_ir, ns, zp  # noqa: E402
 
 TARGET_LUFS = -14.0
-TP_CEILING = -2.0          # limiter ceiling (dBTP); spec <= -1 dBTP, 1 dB spare for AAC re-encodes
+TP_CEILING = -2.5          # limiter ceiling (dBTP); spec <= -1 dBTP. The extra 1.5 dB is for AAC re-encodes:
+                           # ffmpeg's AAC adds up to ~1.4 dB on a sharp hit at 320k, depending on frame alignment
 MUSIC_GAIN = 1.0
 SFX_GAIN = 1.0
 

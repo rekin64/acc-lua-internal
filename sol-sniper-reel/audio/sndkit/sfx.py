@@ -14,6 +14,8 @@ from .dsp import (SR, TAU, band_mag, bp, bump, convolve_ir, cos_ramp, fades, hp,
 # Default level per type, before the cue's own gain offset. Every cue is first normalised so
 # that its loudest 10 ms window (RMS, both channels) is 0 dBFS, then set to this level. The
 # music bus is calibrated so the drop section measures -16 LUFS (ungated) in the same domain.
+# Balance: the drop impact is the loudest event (the opening impact sits ~2.5 dB under it), the
+# build-ups stay low enough that the pre-drop gap really dips, UI sounds are subtle (see PEAK_CAP).
 LEVELS = {
     'impact_big': -8.5, 'impact_drop': -6.0, 'impact_outro': -12.0, 'hit_cut': -13.0,
     'whoosh_fast': -20.0, 'whoosh_long': -19.0, 'whoosh_rise': -21.0, 'zoom_through': -17.0,
@@ -25,14 +27,14 @@ LEVELS = {
 # UI transients also get a sample-peak cap (dB, before the cue's own gain offset): their 15-20 dB
 # crest factor would otherwise put their peaks level with the impacts and make the master limiter
 # pump on every click.
-PEAK_CAP = {'click': -6.5, 'tap_soft': -6.5, 'tick': -6.5, 'toast': -6.5}
+PEAK_CAP = {'click': -7.5, 'tap_soft': -7.5, 'tick': -7.5, 'toast': -7.5}
 
 # Music ducking while a cue plays (look-ahead, offline): (band, depth dB, hold s, release s).
 # 'ui' ducks only the music's 1-8 kHz band (makes room for UI sounds without losing the groove),
 # 'tone' ducks 500 Hz-8 kHz (the success dyad sits around 700-950 Hz),
 # 'full' is a light broadband dip so hits and impacts punch through.
 DUCK = {
-    'click': ('ui', 6.0, 0.05, 0.12), 'tap_soft': ('ui', 6.0, 0.05, 0.12), 'tick': ('ui', 5.0, 0.03, 0.1),
+    'click': ('ui', 6.0, 0.05, 0.12), 'tap_soft': ('ui', 6.0, 0.05, 0.12), 'tick': ('ui', 6.0, 0.03, 0.1),
     'ui_blip': ('ui', 4.0, 0.08, 0.14), 'success': ('tone', 6.0, 0.25, 0.2), 'toast': ('ui', 3.0, 0.18, 0.16),
     'hit_cut': ('full', 1.5, 0.04, 0.15), 'impact_drop': ('full', 2.0, 0.08, 0.3),
     'impact_outro': ('full', 1.5, 0.1, 0.4),
@@ -340,7 +342,7 @@ def click(seed, p=0.0, release=True):
 def tap_soft(seed, p=0.0):
     n = ns(0.1)
     t = taxis(n)
-    m = _modes(n, [1750.0, 2650.0, 4100.0, 720.0], [0.0032, 0.0021, 0.0012, 0.005], [1.0, 0.6, 0.25, 0.45])
+    m = _modes(n, [1750.0, 2650.0, 4100.0, 720.0], [0.0045, 0.003, 0.0016, 0.006], [1.0, 0.6, 0.25, 0.45])
     z = lp(hp(rng('tap', seed).standard_normal(n), 1200.0, 2), 5000.0, 2) * np.exp(-t / 0.0006) * 0.5
     x = m + z
     x[:ns(0.0004)] *= cos_ramp(ns(0.0004))
