@@ -33,3 +33,18 @@ export const CUES = [
   { t: DURATION, type: 'riser', dur: 1.6 },           // low cinematic riser ENDING at the cut
   { t: DURATION, type: 'suck', dur: 0.8 },            // reverse swell / zoom-in whoosh ENDING at the cut
 ];
+
+// Extra motion-blur sub-frames where the hook moves fast: [start, end, samples]
+export const FAST_MOTION = [
+  [0.40, 0.62, 24], // "Wait..." punch-in
+  [0.80, 1.00, 24], // "is this legal?" punch-in
+  [1.30, 1.85, 16], // text glides up, phone push-in starts
+  [3.60, 4.20, 16], // speed ramp builds
+  [4.20, 5.00, 48], // zoom into the screen
+];
+export const samplesFor = (frame, base = 4, fastMax = 48) => {
+  const t = frame / FPS;
+  let n = base;
+  for (const [a, b, k] of FAST_MOTION) if (t >= a && t < b) n = Math.max(n, Math.min(k, fastMax));
+  return n;
+};

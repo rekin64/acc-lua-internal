@@ -4,16 +4,17 @@
 // subset of frames (any frame can be rendered in any order: the timeline is a
 // pure function of time).
 //
-//   node scripts/render.mjs [--workers 4] [--samples 4] [--fast-samples 12] [--shutter 0.5] [--from 0 --to 450] [--out out/frames] [--page src/index.html] [--resume]
+//   node scripts/render.mjs [--workers 4] [--samples 4] [--fast-samples 12] [--shutter 0.5] [--from 0 --to 450] [--out out/frames] [--page src/index.html] [--timing src/timing.js] [--resume]
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { startServer, ROOT } from './server.mjs';
 import { launch, openPage } from './browser.mjs';
-import { FPS, DURATION, samplesFor } from '../src/timing.js';
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : def; };
+// --timing lets another page (e.g. the intro hook) bring its own FPS / DURATION / blur windows
+const { FPS, DURATION, samplesFor } = await import(path.resolve(ROOT, opt('timing', 'src/timing.js')));
 const WORKERS = Number(opt('workers', Math.max(1, Math.min(6, os.cpus().length))));
 const SAMPLES = Number(opt('samples', 4));
 const FAST_SAMPLES = Number(opt('fast-samples', 48)); // cap for timing.js FAST_MOTION windows

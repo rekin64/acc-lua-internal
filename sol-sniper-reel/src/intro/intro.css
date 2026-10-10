@@ -1,0 +1,23 @@
+/* 5 s hook: dark, cinematic, built from the client's phone photo (assets/intro/*). */
+html, body { margin: 0; background: #000; overflow: hidden; }
+#stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #000;
+  font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.layer { position: absolute; left: 0; top: 0; width: 1206px; height: 2622px; transform-origin: 0 0; }
+.layer img { position: absolute; left: 0; top: 0; width: 1206px; height: 2622px; display: block; }
+.bg { filter: blur(1.2px); }
+.screenfx { mix-blend-mode: screen; }
+.sweep { position: absolute; left: 0; top: 0; width: 1206px; height: 2622px; mix-blend-mode: screen; opacity: 0;
+  -webkit-mask-image: url('../../assets/intro/phone.png'); mask-image: url('../../assets/intro/phone.png');
+  -webkit-mask-size: 1206px 2622px; mask-size: 1206px 2622px;
+  background: linear-gradient(115deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 60%);
+  background-size: 300% 100%; }
+.shade { position: absolute; inset: 0; background: #000; pointer-events: none; }
+.vignette { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 85% 70% at 50% 58%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6) 100%); }
+.grain { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: 0.11;
+  background-size: 1080px 1920px; }
+.hook { position: absolute; left: 0; right: 0; top: 0; text-align: center; transform-origin: 540px 0; }
+.hook .ln { display: block; font-weight: 800; font-size: 132px; line-height: 1.0; letter-spacing: -0.04em; color: #FFFFFF;
+  white-space: nowrap; transform-origin: 50% 60%;
+  text-shadow: 0 0 2px rgba(255,255,255,0.35), 0 0 26px rgba(255,255,255,0.22), 0 0 70px rgba(190,170,255,0.10); }
+.hook .ln + .ln { margin-top: 8px; }
