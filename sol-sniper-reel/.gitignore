@@ -6,3 +6,5 @@ audio/*.png
 audio/sndkit/__pycache__/
 audio/__pycache__/
 audio/sndkit/__pycache__/
+audio/cash_intro/stems/
+audio/cash_intro/*.png

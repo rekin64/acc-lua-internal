@@ -1,4 +1,4 @@
-/* 5 s opening on the client's real cash footage (out/cash/plate, see scripts/cash_plate.py). */
+/* 5 s hook on the client's real cash footage (out/cash/plate, see scripts/cash_plate.py). */
 html, body { margin: 0; background: #000; overflow: hidden; }
 #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #000;
   font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -19,5 +19,3 @@ html, body { margin: 0; background: #000; overflow: hidden; }
   white-space: nowrap; transform-origin: 50% 60%;
   text-shadow: 0 2px 4px rgba(0,0,0,0.28), 0 8px 34px rgba(0,0,0,0.42), 0 0 60px rgba(0,0,0,0.18); }
 .hook .ln:first-child { font-size: 158px; }
-/* exposure bridge into the light trading interface (last frames of the whip only) */
-.lift { position: absolute; inset: 0; background: #F3F2F9; opacity: 0; pointer-events: none; }

@@ -3,8 +3,8 @@
 A vertical 1080×1920 reel for Instagram Reels and TikTok, exactly 15.0 s long at 30 fps (H.264 + AAC). It is built like a real product-demo edit: the SOL Sniper landing page and trading terminal are rebuilt as crisp vector UI, then "filmed" with a virtual camera. That camera does punch-ins, whip pans, and speed ramps, with real motion blur, while a cursor clicks through a trade. The soundtrack and sound design are synthesized and cut to the same 125 BPM grid as the picture.
 
 **Final videos:**
-- `dist/sol-sniper-reel-cash.mp4` (15.0 s): the reel with its first 5 s replaced by the client's real cash footage (see below); 5.00–15.00 unchanged
-- `dist/sol-sniper-reel-with-intro.mp4` (20.0 s): the 5 s "Wait... is this legal?" hook followed by the unchanged reel
+- `dist/sol-sniper-reel-cash-intro.mp4` (20.0 s): a 5 s "Wait… is this legal?" hook cut from the client's real cash footage, followed by the complete, unchanged 15 s reel (see below)
+- `dist/sol-sniper-reel-with-intro.mp4` (20.0 s): the earlier 5 s phone-photo hook followed by the unchanged reel
 - `dist/sol-sniper-reel.mp4` (15.0 s): the reel on its own
 
 ## Storyboard (as cut)
@@ -47,28 +47,28 @@ node scripts/render.mjs --page src/intro/index.html --timing src/intro/timing.js
 python3 scripts/encode.py --frames out/intro_frames,out/frames --audio audio/soundtrack_with_intro.wav --out dist/sol-sniper-reel-with-intro.mp4
 ```
 
-## Cash-footage opening (replaces 0.00–5.00)
+## Cash-footage hook (5 s, before the reel)
 
-`dist/sol-sniper-reel-cash.mp4` is still exactly 15.00 s. Its first 5 s are cut from the client's own footage (`assets/source/cash-footage.mp4`, real euro notes put into a shoe box). From 5.00 the reel is unchanged: the same rendered frames (150–449), the same soundtrack, the same "Simulated demo" labels.
+`dist/sol-sniper-reel-cash-intro.mp4` is exactly 20.00 s: the 5 s hook, then the whole 15 s reel from its first frame. The hook replaces the phone-photo hook of `dist/sol-sniper-reel-with-intro.mp4`. Everything from 5.00 is the reel as delivered: its 450 rendered frames, its soundtrack bit for bit, and its "Simulated demo" labels. The hook is cut from the client's own footage (`assets/source/cash-footage.mp4`, real euro notes put into a shoe box). Every cut and punch sits on the reel's 125 BPM grid, counted back from 5.00.
 
 | Time | What happens |
 |---|---|
-| 0.00–1.43 | The notes fanned in the hand, from the very first frame. "Wait…" punches in on the opening hit and "is this legal?" on the next beat, with subtle beat punch-ins |
-| 1.43–2.40 | Punch-in cut on the beat; the move to the box with a short speed ramp through the camera's own pan |
-| 2.40–3.83 | The lid comes off on the hit: zoom-out reveal of the box, in slow motion, then real speed as the notes go in; punch-ins on the beats |
-| 3.83–4.60 | Punch-in cut on the groove's downbeat; the hand brings the next bundle |
-| 4.60–5.00 | The hand pushes the bundle down into the box and the frame carries that movement on as a downward whip (mirrored edges, ~5 frames of heavy motion blur, a slight exposure lift on the last frames). Hard cut on the impact at 5.00 into the cursor pressing "Sniping" |
+| 0.00–1.63 | The notes fanned in the hand, from the very first frame, on the opening hit. "Wait…" punches in with the hit and "is this legal?" on the next accent |
+| 1.63–2.60 | Punch-in cut; the move to the box with a slight speed ramp. The lid flies off and the box is fully open on the 2.60 beat |
+| 2.60–4.03 | Zoom-out reveal of the box in slow motion, then a punch-in cut at 3.07 as the notes pour in at real speed; heartbeat punches |
+| 4.03–4.53 | Punch-in cut: the hand brings the next bundle |
+| 4.53–5.00 | The hand pushes the bundle down into the box and the camera follows the push, accelerating into a downward whip that dives into the shadow of the box (motion blur on the last ~5 frames). Hard cut on the beat into the reel's dark title frame and its opening impact |
 
 - **Footage:** `scripts/cash_frames.py` extracts the clip with the correct BT.709 colours. `scripts/cash_plate.py` retimes it into the 150-frame plate: the speed ramps, with in-between frames synthesized by optical flow where the remap falls between two source frames.
 - **Scene:** `src/cash/` (`cash.js`, `cash.css`, `timing.js`).
-- **Sound:** `audio/build_cash.py` keeps the original music under the new opening, adds the sound design from `src/cash/timing.js`, and filters the music down into the whip. The impact at 5.00 then lands with the full music. After the impact's short tail, the file is bit for bit the original soundtrack.
-- **Claims:** the opening adds no figures or claims. The footage is not presented as SOL Sniper results, and the trades after 5.00 keep their "Simulated demo" labels and the end-card disclaimer.
+- **Sound:** `audio/build_intro.py` builds it from `audio/cash_intro_timing.json` (exported from `src/cash/timing.js`), with the same palette as the phone hook: a bass hit, the tension bed, text accents, heartbeat pulses on the cuts, whooshes on the moves, and a riser plus a suck that stop dead on the cut. It writes `audio/cash_intro/intro.wav` and `audio/cash_intro/soundtrack_with_intro.wav`. The reel's soundtrack follows bit for bit, so its own impact at 5.00 lands on the cut.
+- **Claims:** the hook adds no figures or claims. The footage is not presented as SOL Sniper results.
 
 ```bash
 python3 scripts/cash_frames.py && python3 scripts/cash_plate.py
-node scripts/export-cash-timing.mjs && python3 audio/build_cash.py
+node scripts/export-cash-timing.mjs && python3 audio/build_intro.py --timing audio/cash_intro_timing.json --out audio/cash_intro
 node scripts/render.mjs --page src/cash/index.html --timing src/cash/timing.js --fast-samples 64 --out out/cash_frames
-python3 scripts/encode.py --frames out/cash_frames,out/frames@150:450 --audio audio/soundtrack_cash.wav --out dist/sol-sniper-reel-cash.mp4
+python3 scripts/encode.py --frames out/cash_frames,out/frames --audio audio/cash_intro/soundtrack_with_intro.wav --out dist/sol-sniper-reel-cash-intro.mp4
 ```
 
 ## How it's built

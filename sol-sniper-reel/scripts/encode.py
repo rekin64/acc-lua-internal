@@ -9,8 +9,8 @@ Frames are piped as raw RGB into ffmpeg and muxed with audio/soundtrack.wav.
   python3 scripts/encode.py [--frames out/frames] [--out dist/sol-sniper-reel.mp4] [--crf 16]
   # several frame sets back to back (e.g. the 5 s intro hook + the 15 s reel):
   python3 scripts/encode.py --frames out/intro_frames,out/frames --audio audio/soundtrack_with_intro.wav --out dist/sol-sniper-reel-with-intro.mp4
-  # a set can be limited to a frame range with DIR@FROM:TO (TO exclusive), e.g. the cash opening + the reel from 5.00:
-  python3 scripts/encode.py --frames out/cash_frames,out/frames@150:450 --audio audio/soundtrack_cash.wav --out dist/sol-sniper-reel-cash.mp4
+  # a set can be limited to a frame range with DIR@FROM:TO (TO exclusive), e.g. only the reel's last 10 s:
+  python3 scripts/encode.py --frames out/frames@150:450 --out out/reel_tail.mp4
 """
 import json
 import os

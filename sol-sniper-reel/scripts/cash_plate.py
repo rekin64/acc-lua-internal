@@ -2,9 +2,10 @@
 """Retime the cash footage into the 150-frame plate used by src/cash/ (one image per output frame).
 
 The edit runs the real footage at real speed, with two speed ramps:
-  * 1.63-2.03 s  a short speed-up (peak 1.5x) through the camera's own pan to the box
-  * 2.43-3.43 s  a slow-motion dip (down to 0.4x) on the opened box, so that the hand's push into
-                 the box lands on 4.60-4.83 and the camera whip picks it up (4.83-5.00)
+  * 1.63-2.03 s  a short speed-up (peak 1.17x) through the camera's own pan to the box, so the lid
+                 flies off on 2.47-2.57 and the box is fully open on the 2.60 beat
+  * 2.60-3.47 s  a slow-motion dip (down to 0.46x) on the opened box, so that the hand's push into
+                 the box lands on 4.53-4.83 and the camera follows it into the whip (4.53-5.00)
 Where the remap lands between two source frames, the in-between frame is synthesized with dense
 optical flow (OpenCV DIS, both directions), like an editor's optical-flow time remap. Whole-frame
 positions use the source frame untouched.
@@ -26,8 +27,8 @@ FRAMES = 150  # 5.00 s at 30 fps
 
 # speed ramps as raised-cosine bumps on the playback speed: (start frame, width, amount)
 RAMPS = [
-    (49, 12, +0.5),   # pan to the box: +3 source frames
-    (73, 30, -0.6),   # slow-motion on the opened box: -9 source frames
+    (49, 12, +1 / 6),       # pan to the box: +1 source frame
+    (78, 26, -7 / 13),      # slow motion on the opened box: -7 source frames
 ]
 
 
