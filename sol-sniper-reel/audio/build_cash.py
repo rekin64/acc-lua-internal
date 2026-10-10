@@ -37,11 +37,11 @@ CUE SEMANTICS (cash_timing.json `cues`: {t, type, gain?, pan?, dir?, dur?}; same
                into this pre-master domain: ACCENT_LEVEL (see below).
   every other type: sndkit/sfx.py render_cue with the score as context (grid kicks / claps, harmony),
                exactly as build_audio.py (e.g. a hit_cut 1-20 ms off a grid kick drops its low knock).
-               One extension (align_late_kick): render_cue phase-aligns an impact's low layers to a grid kick
-               within 20 ms; an impact between beats (5.000, kicks at 4.80 / 5.28) instead gets the same
-               delay / polarity search against the first kick under its sub tail (<= LATE_KICK). For the
-               5.000 impact that is a polarity flip of its sub + boom (transient untouched, level unchanged):
-               -1.6 -> +1.1 dB vs the power sum on the 5.28 kick, -0.3 -> +0.3 dB with the reel's bass at 5.04.
+               The 5.000 impact lies between beats (kicks at 4.80 / 5.28), so render_cue leaves its low layers
+               as designed (in phase with its punch). Flipping them to sum fuller with the 5.28 kick under the
+               sub tail was tried and rejected: +2 dB on that kick, but the impact's own attack loses 2.5-5.5 dB
+               below 400 Hz over its first 10-30 ms (the boom / harmonics cancel the punch). Unflipped, the sub
+               tail + the 5.28 kick sum to the kick's own level (no loss); reported under LOW-END ALIGNMENT.
   Music ducking under the new cues: build_audio.py's logic and sndkit/sfx.py DUCK table, unchanged. After the
   cut the reel's own UI sounds (success 5.100, toast 5.267) duck the new sounds still ringing (impact tail)
   with the same DUCK entries they use on the music, so they keep the space they had in the original.
@@ -123,10 +123,8 @@ from sndkit.dsp import (  # noqa: E402
     cos_ramp,
     event_duck,
     hp,
-    lp,
     make_ir,
     ns,
-    pan,
     smoothstep,
     tv_biquad,
     zp,
@@ -165,8 +163,7 @@ XFADE = 0.12               # s: equal-gain crossfade into soundtrack.wav, [K - X
 L_NEW = TAIL_END + XFADE   # s of new master after the cut
 K = N_CUT + ns(L_NEW)      # first sample copied from soundtrack.wav
 SFX_SPAN = 6.4             # s: the new cues (and their reverbs) are rendered over [0, SFX_SPAN)
-LATE_KICK = 0.35           # s: an impact with no grid kick within 20 ms (render_cue's own alignment) gets its
-                           # low layers aligned to the first grid kick this far after it (under its sub tail)
+LATE_KICK = 0.35           # s: report how an impact's sub tail sums with the grid kicks this far after it
 
 BW = 2 * 3                 # bytes per PCM frame (2 ch, 24 bit)
 
@@ -321,52 +318,6 @@ def hook_irs():
                 room=(make_ir(0.7, 0.45, 0.28, seed=42, predelay=0.005, hp_f=250.0, lp_f=8000.0, er_span=0.02), 1.0))
 
 
-def align_late_kick(cue, idx, ctx, layers):
-    """render_cue phase-aligns an impact's low layers (delay / polarity, sfx._kick_align) to a grid kick within
-    20 ms of the cue. An impact between two beats meets the next kick under its sub tail instead (5.000 -> the
-    build's kick at 5.280): same search and same rule (smallest move wins unless a bigger one is > 0.3 dB fuller,
-    below 160 Hz over the kick's first 150 ms), with the window on that kick. The transient layers stay on the
-    cue sample; the level is render_cue's (its canonical render's loudest 10 ms). -> (layers, note or None)"""
-    typ = cue['type']
-    if typ not in ('impact_big', 'impact_drop', 'impact_outro'):
-        return layers, None
-    s = ns(cue['t'])
-    kicks = ctx['kick_trig']
-    if any(abs(k - s) <= ns(0.02) for k in kicks):
-        return layers, None  # render_cue aligned it already
-    late = [k for k in kicks if ns(0.02) < k - s <= ns(LATE_KICK)]
-    if not late:
-        return layers, None
-    kind, seed = typ.split('_')[1], 1000 + idx
-    p = float(cue.get('pan', 0.0))
-    g = 10.0 ** ((FX.LEVELS[typ] + float(cue.get('gain', 0.0))) / 20.0) / FX.ref_level(FX.impact(kind, seed))[0]
-
-    def make(**kw):
-        lay = [(sig * g, off, snd) for sig, off, snd in FX.impact(kind, seed, **kw)]
-        return [(pan(sig, p), off, snd) for sig, off, snd in lay] if p else lay
-
-    chk = max(float(np.abs(a[0] - b[0]).max()) for a, b in zip(make(), layers))
-    assert chk == 0.0, f'impact re-render differs from render_cue ({chk})'
-    off, win = late[0] - s, ns(0.15)
-    low = lp(FX.impact(kind, seed, low_only=True) * g, 160.0, 4)
-    kick = lp(ctx['kick_track'][s:s + off + win], 160.0, 4)[off:]
-    best, e0 = None, None
-    for d in range(0, ns(0.02) + 1, ns(0.0005)):
-        sh = np.concatenate([np.zeros(d), low])[off:off + win]
-        for pol in (1.0, -1.0):
-            e = float(np.sum((kick + pol * sh) ** 2))
-            if e0 is None:
-                e0 = e
-            if best is None or e > best[0] * 10 ** 0.03:
-                best = (e, d, pol)
-    e, d, pol = best
-    if d == 0 and pol > 0:
-        return layers, None
-    return make(low_delay=d, low_polarity=pol), (f'kick {off / SR * 1000:+.0f} ms (under the sub tail): low layers moved '
-                                                 f"{d / SR * 1000:+.2f} ms{', polarity flipped' if pol < 0 else ''} "
-                                                 f'({10 * np.log10(e / e0):+.1f} dB low end on that kick vs as-is)')
-
-
 def render_cues(cues, orig, log):
     """Every cue rendered in isolation (dry + its own reverb returns) over [0, SFX_SPAN), LEVELS domain.
     Reverb is linear, so the sum of the isolated renders is build_audio's shared-bus mix.
@@ -400,9 +351,6 @@ def render_cues(cues, orig, log):
             ctx['notes'][i] = 'intro_fx accent (hook hall/room + bus EQ)'
         else:
             lay = FX.render_cue(cue, i, ctx)
-            lay, note = align_late_kick(cue, i, ctx, lay)
-            if note:
-                ctx['notes'][i] = '; '.join(x for x in (ctx['notes'].get(i, ''), note) if x)
         s = ns(cue['t'])
         dry = np.zeros((2, n))
         feeds = {}

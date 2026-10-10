@@ -14,14 +14,14 @@ export const CUES = [
   { t: 0.0, type: 'accent', gain: 0 },                  // "Wait..." punch
   { t: B(1), type: 'accent', gain: -2 },                // "is this legal?" punch (0.47)
   { t: B(3), type: 'hit_cut', gain: -4 },               // jump cut + sped-up move to the box (1.43)
-  { t: B(3), type: 'whoosh_fast', gain: -8, pan: -0.2 },
+  { t: B(3), type: 'whoosh_fast', gain: -6, pan: -0.2 },
   { t: B(5), type: 'hit_cut', gain: -3 },               // the box opens: reveal punch-in (2.40)
-  { t: B(5), type: 'whoosh_rise', gain: -10 },
+  { t: B(5), type: 'whoosh_rise', gain: -8 },
   { t: B(6), type: 'tick', gain: -8 },                  // punch (2.87)
   { t: B(7), type: 'tick', gain: -7 },                  // punch (3.37)
   { t: B(8), type: 'hit_cut', gain: -4 },               // jump cut + punch on the groove's downbeat (3.83)
   { t: B(9), type: 'tick', gain: -6 },                  // punch (4.33)
-  { t: 5.0, type: 'whip', dur: 0.4, pan: 0.0 },         // restrained whoosh following the hand down, ENDS at 5.00
+  { t: 5.0, type: 'whip', dur: 0.4, pan: 0.0, dir: 0 }, // restrained whoosh following the hand down (centred: vertical move), ENDS at 5.00
   { t: 5.0, type: 'impact_drop', gain: -2 },            // the cut into the trading interface
 ];
 
