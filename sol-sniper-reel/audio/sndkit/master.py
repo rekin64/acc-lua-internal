@@ -1,5 +1,5 @@
 """Mastering: BS.1770-4 loudness, true peak, glue compression, soft clip, look-ahead
-true-peak limiter, final fade."""
+true-peak limiter, codec (AAC) overshoot guard, short end fade to digital silence."""
 import numpy as np
 from scipy import signal
 from scipy.ndimage import minimum_filter1d, uniform_filter1d
@@ -110,17 +110,21 @@ def soft_clip(x, thr=0.8, os=4):
     return signal.resample_poly(y, 1, os, axis=1)[:, :x.shape[1]]
 
 
-def limiter(x, ceiling_db=-1.3, lookahead=0.0015, release=0.08, start_extra_db=0.25, start_len=0.03):
+def limiter(x, ceiling_db=-1.3, lookahead=0.0015, release=0.08, start_extra_db=0.25, start_len=0.03,
+            extra_db=None):
     """Look-ahead true-peak limiter (offline, zero added latency).
 
     The first `start_len` seconds get `start_extra_db` more headroom: the opening impact starts
-    from digital silence, where an AAC encoder's first frame tends to overshoot."""
+    from digital silence, where an AAC encoder's first frame tends to overshoot. `extra_db`
+    (optional, per sample, >= 0) lowers the ceiling locally on top of that."""
     n = x.shape[1]
     k = ns(start_len)
-    extra_db = np.zeros(n)
-    extra_db[:k] = start_extra_db
-    extra_db[k:2 * k] = start_extra_db * (1.0 - cos_ramp(k))[:max(0, min(k, n - k))]
-    c = 10.0 ** ((ceiling_db - extra_db) / 20.0)
+    ex = np.zeros(n)
+    ex[:k] = start_extra_db
+    ex[k:2 * k] = start_extra_db * (1.0 - cos_ramp(k))[:max(0, min(k, n - k))]
+    if extra_db is not None:
+        ex = ex + np.asarray(extra_db, dtype=float)
+    c = 10.0 ** ((ceiling_db - ex) / 20.0)
     pk = _tp_envelope(x)
     req = np.minimum(1.0, c / np.maximum(pk, 1e-12))
     L = max(ns(lookahead), 1)
@@ -138,23 +142,38 @@ def limiter(x, ceiling_db=-1.3, lookahead=0.0015, release=0.08, start_extra_db=0
     return x * out[None, :], out
 
 
-def master(mix, target_lufs=-14.0, ceiling_db=-1.3, fade_out=0.45, log=print):
+def end_fade(n, fade_out):
+    """Gain curve: 1 until the last `fade_out` seconds, then a raised-cosine fade that reaches
+    exactly 0 on the last sample (digital silence AT the end, no click)."""
+    g = np.ones(n)
+    nf = ns(fade_out)
+    if nf > 1:
+        g[n - nf:] = 0.5 + 0.5 * np.cos(np.pi * np.arange(nf) / (nf - 1))
+    g[-1] = 0.0
+    return g
+
+
+def master(mix, target_lufs=-14.0, ceiling_db=-1.3, fade_out=0.15, log=print, guard_db=None, g_db=4.0):
+    """hp -> -18 LUFS -> glue comp -> [gain -> soft clip -> true-peak limiter -> codec guard -> end
+    fade], with the gain iterated until the integrated loudness hits `target_lufs`.
+
+    guard_db (optional, per sample, dB >= 0): a smooth gain dip applied after the limiter where
+    the AAC delivery encode would overshoot (see build_audio.aac_guard). It sits after the limiter
+    so it scales the whole AAC frame (codec overshoot scales with it) instead of only the peaks.
+    g_db: starting make-up gain (pass the previous result to converge in one or two passes)."""
     x = hp(mix, 18.0, 2)  # DC / subsonic guard
     x *= 10.0 ** ((-18.0 - integrated_lufs(x)) / 20.0)
     x, gr = glue_comp(x, thr_db=-13.5, ratio=2.0, attack=0.02, release=0.18, knee=6.0)
     log(f'  glue comp: max GR {gr.max():.2f} dB, mean GR (where active) {gr[gr > 0.05].mean() if np.any(gr > 0.05) else 0:.2f} dB')
     n = x.shape[1]
-    fade = np.ones(n)
-    nf = ns(fade_out)
-    fade[n - nf:] = cos_ramp(nf)[::-1] ** 1.5
-    fade[-1] = 0.0
-    g_db = 4.0
+    fade = end_fade(n, fade_out)
+    post = fade if guard_db is None else fade * 10.0 ** (-np.asarray(guard_db, dtype=float) / 20.0)
     y = None
     for it in range(8):
         y = x * 10.0 ** (g_db / 20.0)
         y = soft_clip(y, thr=10.0 ** ((ceiling_db - 1.5) / 20.0))
         y, lg = limiter(y, ceiling_db)
-        y = y * fade[None, :]
+        y = y * post[None, :]
         lufs = integrated_lufs(y)
         err = target_lufs - lufs
         log(f'  iter {it}: gain {g_db:+.2f} dB -> {lufs:.2f} LUFS, TP {true_peak(y):.2f} dBTP, max limiter GR {-20*np.log10(lg.min()):.2f} dB')
@@ -163,4 +182,4 @@ def master(mix, target_lufs=-14.0, ceiling_db=-1.3, fade_out=0.45, log=print):
         g_db += err
     glue_t = (np.arange(len(gr)) + 0.5) * 48 / SR  # glue_comp works on 48-sample blocks
     return y, dict(gain_db=g_db, limiter_gr_db=float(-20 * np.log10(lg.min())), glue_gr_db=float(gr.max()),
-                   limiter_gain=lg, glue_gr=gr, glue_t=glue_t)
+                   limiter_gain=lg, glue_gr=gr, glue_t=glue_t, fade=fade)
