@@ -10,11 +10,13 @@
 import { clamp, lerp, prog, remap, ease, kf, spring, css, h } from './lib/engine.js';
 import { beat, snap } from './timing.js';
 import { createSite, createSiteBackground } from './components/site.js';
-import { createApp } from './components/app.js';
+import { createApp, glintPnl } from './components/app.js';
 import { createLogo } from './components/brand.js';
 import { createCursor, cursorAt, clickState } from './components/cursor.js';
 
 const CX = 540, CY = 960;
+// Outro layout (also drives the montage's last push so the match-cut lines up)
+const OUTRO_LOGO = 116, OUTRO_Y = 800, OUTRO_CTA = 990;
 /** Beat n on the frame grid. */
 const B = (n) => snap(beat(n));
 const val = (v) => (typeof v === 'function' ? v() : v);
@@ -86,10 +88,11 @@ function makeSuper(stage, lines, { top, light = false } = {}) {
   return { el, words };
 }
 /** Pose a super: words[i] enters at ins[i]; everything exits over [out, out+0.2]. */
-function poseSuper(sup, t, ins, out) {
+function poseSuper(sup, t, ins, out, dx = 0) {
   const visible = t >= ins[0] - 0.01 && t < out + 0.24;
   css(sup.el, 'display', visible ? 'block' : 'none');
   if (!visible) return;
+  css(sup.el, 'transform', `translate3d(${dx.toFixed(2)}px, 0, 0)`);
   sup.words.forEach((w, i) => {
     const pin = ease.glide(prog(t, ins[i], ins[i] + 0.42));
     const pout = ease.inCubic(prog(t, out + i * 0.025, out + i * 0.025 + 0.2));
@@ -143,22 +146,33 @@ export function buildReel(stage) {
   const cardA = h(`<div class="world-card"></div>`);
   cardA.appendChild(siteA.el);
   const curA = createCursor();
-  s2.rig.append(cardA, curA.el);
+  // The page continues above the hero (mirrored background), so punch-ins near the
+  // nav never reveal the stage behind the card.
+  const extA = pageAbove();
+  s2.rig.append(cardA, extA, curA.el);
   const flashA = h(`<div class="flash" style="background:var(--ss-grad-btn)"></div>`);
   s2.el.appendChild(flashA);
+  // backdrop lightens from the title's black to soft grey as the card rises
+  const lightA = h(`<div class="flash" style="background:#E6E8F0"></div>`);
+  s2.el.insertBefore(lightA, s2.rig);
   const SA = (n) => () => siteA.rect(n);
-  const logoCam = (dz = 0, dx = 0) => () => aim(siteA.rect('logo').cx + dx, siteA.rect('logo').cy, 3.45 + dz, CX, 470);
+  // logo push-in: anchor the logo high enough that the frame never shows the stage above the site (site y >= 0)
+  const logoCam = (dz = 0, dx = 0) => () => {
+    const l = siteA.rect('logo');
+    return aim(l.cx + dx, l.cy, 3.45 + dz, CX, 520);
+  };
+  // hero: keep the site's bottom edge (y = 1080) at or below the frame bottom -> focus y <= 1080 - (1920 - 900) / z
   const heroCam = (z) => () => {
     const hl = siteA.rect('headline'), cta = siteA.rect('cta');
-    return aim(960, (hl.y + cta.y + cta.h) / 2, z, CX, 900);
+    return aim(960, Math.min((hl.y + cta.y + cta.h) / 2, 1080 - (1920 - 900) / z), z, CX, 900);
   };
   const s2Keys = [
     { t: T2, x: 960, y: 540, z: 0.54 },
     { t: B(4), x: 960, y: 540, z: 0.585, e: ease.outSine },
     { t: B(5), ...wrapCam(logoCam(0)), e: ease.ramp },
     { t: B(6.5), ...wrapCam(logoCam(0.14, 14)), e: ease.inOutSine },
-    { t: B(7.25), ...wrapCam(heroCam(1.9)), e: ease.ramp },
-    { t: B(8), ...wrapCam(heroCam(1.97)), e: ease.outSine },
+    { t: B(7.25), ...wrapCam(heroCam(2.1)), e: ease.ramp },
+    { t: B(8), ...wrapCam(heroCam(2.17)), e: ease.outSine },
     { t: T2_END, x: () => siteA.rect('cta').cx, y: () => siteA.rect('cta').cy, z: 15, e: ease.inExpo },
   ];
   const s2Clicks = [B(8)];
@@ -170,10 +184,12 @@ export function buildReel(stage) {
       const { press, ring } = clickState(t, s2Clicks);
       siteA.update({ t, ctaHover: prog(t, B(7.6), B(7.6) + 0.08), ctaPress: press });
       const rise = ease.glide(prog(t, T2, T2 + 0.62));
+      const light = ease.inOutSine(prog(t, T2 + 0.08, T2 + 0.5));
+      css(lightA, 'opacity', light.toFixed(3));
+      css(cardA, 'boxShadow', `0 30px 90px rgba(${Math.round(lerp(0, 28, light))},${Math.round(lerp(0, 30, light))},${Math.round(lerp(0, 60, light))},${lerp(0.55, 0.2, light).toFixed(3)}), 0 0 0 1px rgba(28,30,60,${(0.07 * light).toFixed(3)})`);
       const cam = camAt(t, s2Keys);
       css(s2.rig, 'transform', camTransform(cam, 0, (1 - rise) * 1500));
-      // card chrome only while it reads as a card
-      css(cardA, 'borderRadius', `${(22).toFixed(1)}px`);
+      css(extA, 'opacity', ease.inOutSine(prog(t, B(4) + 0.13, B(4) + 0.27)).toFixed(3));
       const [cx, cy] = cursorAt(t, [
         [B(6.9), cta.cx + 250, cta.cy + 330],
         [B(7.6), cta.cx + 8, cta.cy + 6, 0.1],
@@ -187,6 +203,8 @@ export function buildReel(stage) {
 
   /* ============================== 3+4 · APP DEMO ============================== */
   const T3 = T2_END, T4_END = B(20);
+  const WHIP0 = B(12.6), WHIP1 = B(13) + 0.18;
+  let whipDX = 0;
   const s3 = shot(stage, '#050507');
   const appA = createApp();
   const cardB = h(`<div class="world-card" style="border-radius:26px"></div>`);
@@ -195,6 +213,9 @@ export function buildReel(stage) {
   s3.rig.append(cardB, curB.el);
   const flashB = h(`<div class="flash" style="background:var(--ss-grad-btn)"></div>`);
   s3.el.appendChild(flashB);
+  const darkB = h(`<div class="flash" style="background:#E6E8F0"></div>`);
+  s3.el.insertBefore(darkB, s3.rig);
+  s3.el.style.background = '#F5F6FA';
   const AR = (n) => appA.rect(n);
   const FEED_Z = 1.92;
   const feedCam = (z = FEED_Z, dy = 0) => () => { const f = AR('feed'); return aim(f.cx, f.y, z, CX, 118 + dy); };
@@ -232,6 +253,8 @@ export function buildReel(stage) {
     const ins = kf(t, [[T3, 0], [T3 + 0.06, 0], [T3 + 0.22, 1, ease.outCubic], [B(9) - 0.02, 1], [B(9) + 0.2, 2, ease.outCubic], [B(12.2), 2], [B(12.8), 3, ease.inOutCubic]]);
     const { press } = clickState(t, s3Clicks);
     const near = (c) => (Math.abs(t - c) < 0.2 ? press : 0);
+    const reveal = remap(t, T3, T4_END, 0.84, 1);
+    const pnl = glintPnl(reveal);
     return {
       t,
       feed: {
@@ -243,9 +266,9 @@ export function buildReel(stage) {
         snipeState: t < B(10) + 0.05 ? 'idle' : t < B(10.6) ? 'pending' : 'done',
       },
       chart: {
-        reveal: remap(t, T3, T4_END, 0.84, 1),
+        reveal,
         entry: 1,
-        pnl: kf(t, [[B(13), 24.8], [B(15), 38.2, ease.outCubic], [B(17), 38.2], [B(17) + 0.2, 41.7, ease.outCubic]]),
+        pnl,
         pnlFlash: bump(t, B(15) - 0.08, B(15) + 0.5),
       },
       trade: {
@@ -257,7 +280,7 @@ export function buildReel(stage) {
       },
       positions: {
         pnl: {
-          GLINT: kf(t, [[B(16), 38.2], [B(17), 38.2], [B(17) + 0.22, 41.7, ease.outCubic]]),
+          GLINT: pnl,
           MOCHI: kf(t, [[B(16), 12.6], [B(18), 12.6], [B(18) + 0.2, 13.4]]),
           ZORP: -4.1,
           FROGO: kf(t, [[B(16), 46.2], [B(17.5), 48.1, ease.inOutSine], [B(18), 50.0, ease.outCubic]]),
@@ -265,15 +288,23 @@ export function buildReel(stage) {
         flash: { GLINT: bump(t, B(17), B(17) + 0.45), FROGO: bump(t, B(18), B(18) + 0.55) },
         tp: ease.outCubic(prog(t, B(18), B(18) + 0.12)),
       },
-      toast: { show: bump(t, B(15.5) + 0.02, B(16) + 0.25, 0.22, 0.12), text: 'Buy filled · 0.50 SOL', sub: '9.1M GLINT · simulated' },
+      toast: { show: bump(t, B(15.5) + 0.02, B(16) + 0.25, 0.22, 0.12), text: 'Buy filled · 0.50 SOL', sub: '6.53M GLINT · simulated' },
     };
   }
   parts.push({
     t0: T3, t1: T4_END, el: s3.el,
     render(t) {
       appA.update(appState(t));
+      const pull = ease.inOutSine(prog(t, B(19) + 0.02, B(19) + 0.3));
+      css(darkB, 'opacity', pull.toFixed(3));
+      css(cardB, 'boxShadow', `0 30px 90px rgba(28,30,60,${(0.22 * pull).toFixed(3)}), 0 0 0 1px rgba(28,30,60,${(0.07 * pull).toFixed(3)})`);
       const cam = camAt(t, s3Keys);
       css(s3.rig, 'transform', camTransform(cam));
+      // overlays ride the whip pan out of frame (same screen-space motion as the UI)
+      if (t >= WHIP0 && t < WHIP1) {
+        const c0 = camAt(WHIP0, s3Keys);
+        whipDX = (c0.x - cam.x) * cam.z;
+      } else whipDX = t >= WHIP1 ? -4000 : 0;
       const blur = Math.max(lerp(14, 0, ease.outCubic(prog(t, T3, T3 + 0.14))), 0);
       css(s3.rig, 'filter', blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : 'none');
       css(flashB, 'opacity', (0.9 * (1 - ease.outCubic(prog(t, T3, T3 + 0.16)))).toFixed(3));
@@ -300,16 +331,16 @@ export function buildReel(stage) {
   const siteRig = s5.rig;
   const appRig = h(`<div class="rig"></div>`);
   s5.el.appendChild(appRig);
-  siteRig.append(siteB.el, curC.el);
+  siteRig.append(siteB.el, pageAbove(), curC.el);
   appRig.appendChild(appB.el);
   const SB = (n) => siteB.rect(n);
   const BR = (n) => appB.rect(n);
   const baseApp = (t) => ({
     t: 9 + t,
     feed: { inserted: 2, highlight: 'GLINT', highlightAmt: 1, snipeState: 'done' },
-    chart: { reveal: 1, entry: 1, pnl: 41.7 },
+    chart: { reveal: 1, entry: 1, pnl: glintPnl(1) },
     trade: { preset: 1, buyState: 'filled' },
-    positions: { pnl: { GLINT: 41.7, MOCHI: 13.4, ZORP: -4.1, FROGO: 50.0 }, tp: 1 },
+    positions: { pnl: { GLINT: glintPnl(1), MOCHI: 13.4, ZORP: -4.1, FROGO: 50.0 }, tp: 1 },
     toast: { show: 0 },
   });
   const cuts = [
@@ -324,16 +355,16 @@ export function buildReel(stage) {
     { // feed streaming fast
       t0: B(22), t1: B(23), world: 'app',
       state: (t, p) => ({ ...baseApp(t), feed: { inserted: lerp(2, 5.6, ease.inOutSine(p)), highlight: null, highlightAmt: 0, snipeState: 'idle' } }),
-      cam: (p) => { const f = BR('feed'); return aim(f.cx, f.y + 230, lerp(2.45, 2.3, p), CX, 700); },
+      cam: (p) => { const f = BR('feed'); return aim(f.cx, f.y + 230, lerp(1.98, 1.9, p), CX, 700); },
     },
     { // PnL close-up
       t0: B(23), t1: B(23.5), world: 'app',
-      state: (t, p) => ({ ...baseApp(t), positions: { pnl: { GLINT: lerp(38.2, 41.7, ease.outCubic(p)), MOCHI: 13.4, ZORP: -4.1, FROGO: 50.0 }, flash: { GLINT: 1 - p * 0.6 }, tp: 1 } }),
-      cam: (p) => { const r = BR('positions.pnl.GLINT'); return aim(r.cx, r.cy, lerp(4.2, 4.5, p)); },
+      state: (t, p) => ({ ...baseApp(t), positions: { pnl: { GLINT: glintPnl(lerp(0.955, 1, ease.outCubic(p))), MOCHI: 13.4, ZORP: -4.1, FROGO: 50.0 }, flash: { GLINT: 1 - p * 0.6 }, tp: 1 } }),
+      cam: (p) => { const r = BR('positions.pnl.GLINT'); return aim(r.cx - 80, r.cy, lerp(4.2, 4.5, p)); },
     },
     { // chart: candles forming
       t0: B(23.5), t1: B(24), world: 'app',
-      state: (t, p) => ({ ...baseApp(t), chart: { reveal: lerp(0.93, 1, p), entry: 1, pnl: 41.7 } }),
+      state: (t, p) => ({ ...baseApp(t), chart: { reveal: lerp(0.93, 1, p), entry: 1, pnl: glintPnl(lerp(0.93, 1, p)) } }),
       cam: (p) => { const c = BR('chart.plot'); return aim(c.x + c.w * 0.74, c.y + c.h * 0.42, lerp(2.7, 2.85, p)); },
     },
     { // Buy -> Filled close-up
@@ -344,11 +375,12 @@ export function buildReel(stage) {
     { // AI score close-up
       t0: B(24.5), t1: B(25), world: 'app',
       state: (t, p) => baseApp(t),
-      cam: (p) => { const a = BR('feed.ai.GLINT'); return aim(a.cx - 40, a.cy, lerp(4.6, 4.9, p)); },
+      cam: (p) => { const a = BR('feed.ai.GLINT'), b = BR('feed.snipe.GLINT'); return aim(lerp(a.cx, b.x + b.w, 0.5) + lerp(-12, 12, p), a.cy, lerp(3.7, 3.95, p)); },
     },
     { // logo close-up: match-cuts into the outro lockup
       t0: B(25), t1: T5_END, world: 'site',
-      cam: (p) => { const l = SB('logo'); return aim(l.cx, l.cy, lerp(5.3, 5.75, ease.inSine(p)), CX, 800); },
+      // ends at the outro's opening logo size so the cut reads as one continuous push
+      cam: (p) => { const l = SB('logo'); return aim(l.cx, l.cy, lerp(5.2, OUTRO_LOGO * 1.1 / SB('logo.word').h * 0.98, ease.inQuad(p)), CX, OUTRO_Y); },
     },
   ];
   parts.push({
@@ -382,10 +414,11 @@ export function buildReel(stage) {
   obg.style.position = 'absolute';
   obg.style.inset = '0';
   const group = h(`<div style="position:absolute;inset:0;transform-origin:540px 900px"></div>`);
-  const logo = createLogo({ size: 104, gradient: true });
-  const logoWrap = h(`<div class="outro-center" style="top:752px"></div>`);
+  const logo = createLogo({ size: OUTRO_LOGO });
+  logo.style.transformOrigin = '50% 50%';
+  const logoWrap = h(`<div class="outro-center" style="top:${OUTRO_Y}px;height:0;align-items:center"></div>`);
   logoWrap.appendChild(logo);
-  const ctaWrap = h(`<div class="outro-center" style="top:986px"></div>`);
+  const ctaWrap = h(`<div class="outro-center" style="top:${OUTRO_CTA}px"></div>`);
   const cta = h(`<div class="outro-cta">Start Sniping<span class="hl"></span></div>`);
   ctaWrap.appendChild(cta);
   const disc = h(`<div class="disclaimer" style="top:1384px">Demo footage with simulated trades, for illustration only.<br>Not financial advice. Crypto trading involves risk.</div>`);
@@ -409,7 +442,7 @@ export function buildReel(stage) {
       const hover = prog(t, B(29.6), B(29.6) + 0.08);
       css(cta, 'transform', `translate3d(0, ${((1 - sp) * 46 - hover * 3).toFixed(2)}px, 0) scale(${(lerp(0.9, 1, sp) * (1 - 0.045 * press)).toFixed(4)})`);
       css(ctaHl, 'opacity', (hover * 0.35 - press * 0.2).toFixed(3));
-      const r = { cx: 540, cy: 986 + 64 };
+      const r = { cx: 540, cy: OUTRO_CTA + 70 };
       const [x, y] = cursorAt(t, [[B(28.6), r.cx + 330, r.cy + 420], [B(29.6), r.cx + 52, r.cy + 18, 0.12]]);
       curD.update({ x, y, opacity: ease.outCubic(prog(t, B(28.6), B(28.6) + 0.12)), press, ring });
       css(disc, 'opacity', ease.outCubic(prog(t, T6 + 0.5, T6 + 0.9)).toFixed(3));
@@ -419,18 +452,18 @@ export function buildReel(stage) {
   /* ============================== overlays ============================== */
   function overlays(t) {
     poseSuper(supSpeed, t, [B(5), B(5) + 0.07, B(5) + 0.14], B(6.5) - 0.16);
-    poseSuper(supSpot, t, [B(9), B(10), B(11)], B(12.5));
+    poseSuper(supSpot, t, [B(9), B(10), B(11)], WHIP1 - 0.2, whipDX);
     poseSuper(supFast, t, [B(13), B(13) + 0.08, B(15), B(15) + 0.08], B(19) - 0.25);
     css(scrim, 'opacity', (ease.outCubic(prog(t, T3 + 0.1, T3 + 0.4)) * (1 - ease.inOutSine(prog(t, B(19) - 0.2, B(19) + 0.1)))).toFixed(3));
-    css(simChip, 'opacity', (ease.outCubic(prog(t, T3 + 0.15, T3 + 0.4)) * (1 - prog(t, T5_END - 0.12, T5_END))).toFixed(3));
+    css(simChip, 'opacity', (ease.outCubic(prog(t, T3 + 0.15, T3 + 0.4)) * (1 - prog(t, B(25) - 0.1, B(25)))).toFixed(3));
     // floating "filled" notification for "React."
     const tin = B(11) - 0.01;
     const tp = spring(t - tin, { freq: 2.6, damping: 0.75 });
-    const tout = ease.inCubic(prog(t, B(12.6), B(12.6) + 0.2));
-    css(toast, 'display', t >= tin && t < B(12.6) + 0.22 ? 'flex' : 'none');
+    const tout = 0;
+    css(toast, 'display', t >= tin && t < WHIP1 ? 'flex' : 'none');
     css(toast, 'top', '1090px');
     css(toast, 'opacity', (ease.outCubic(prog(t, tin, tin + 0.12)) * (1 - tout)).toFixed(3));
-    css(toast, 'transform', `translate3d(0, ${((1 - tp) * 60 + tout * 30).toFixed(2)}px, 0) scale(${lerp(0.96, 1, tp).toFixed(4)})`);
+    css(toast, 'transform', `translate3d(${whipDX.toFixed(2)}px, ${((1 - tp) * 60).toFixed(2)}px, 0) scale(${lerp(0.96, 1, tp).toFixed(4)})`);
   }
 
   return {
@@ -443,6 +476,13 @@ export function buildReel(stage) {
       overlays(t);
     },
   };
+}
+
+/** Mirrored copy of the site background placed directly above a site (y < 0). */
+function pageAbove() {
+  const el = createSiteBackground();
+  el.style.cssText += ';position:absolute;left:0;top:-1077px;width:1920px;height:1080px;transform:scaleY(-1);pointer-events:none;'; // 3px overlap hides the seam
+  return el;
 }
 
 /** Spread a lazily-evaluated camera into {x,y,z} getters for camAt keys. */

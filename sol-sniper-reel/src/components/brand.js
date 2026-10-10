@@ -7,21 +7,29 @@
 
 let uid = 0;
 
-/** Inline SVG string for the gradient logo mark. `size` in px. */
+// Portrait mark (16:20) redrawn to the captured silhouette: a pink lead-in stroke from the top-left,
+// a sky-blue body tapering straight down to a pink tail tip, and a small cyan right wing. One closed
+// path, three fills (base body ramp + pink and cyan tints that fade out), so there are no seams.
+export const MARK_ASPECT = 16 / 20;
+
+/** Inline SVG string for the gradient logo mark. `size` = height in px (width = size * 0.8). */
 export function logoMarkSVG(size = 24) {
   const id = `ssg${++uid}`;
-  return `<svg class="ss-mark" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  const w = +(size * MARK_ASPECT).toFixed(2);
+  return `<svg class="ss-mark" width="${w}" height="${size}" viewBox="0 0 16 20" fill="none" aria-hidden="true">
   <defs>
-    <linearGradient id="${id}a" x1="2" y1="3" x2="20" y2="16" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#D88AF2"/><stop offset=".45" stop-color="#8FA8F6"/><stop offset="1" stop-color="#5DC2F7"/>
+    <linearGradient id="${id}b" x1="9.14" y1="3" x2="9.83" y2="19.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#80AEF7"/><stop offset=".42" stop-color="#5DB7F6"/><stop offset=".74" stop-color="#7DA8F4"/><stop offset="1" stop-color="#C77FF0"/>
     </linearGradient>
-    <linearGradient id="${id}b" x1="10" y1="6" x2="11" y2="21" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#8AB4F7"/><stop offset=".55" stop-color="#6FBFF6"/><stop offset="1" stop-color="#C47FEF"/>
+    <linearGradient id="${id}a" x1="0.4" y1="0.45" x2="8.23" y2="6.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E39BF0"/><stop offset=".55" stop-color="#C28FF3"/><stop offset="1" stop-color="#A69BF5" stop-opacity="0"/>
     </linearGradient>
+    <linearGradient id="${id}c" x1="15.71" y1="1.9" x2="11.31" y2="6.9" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#52CBF6"/><stop offset="1" stop-color="#5DB7F6" stop-opacity="0"/>
+    </linearGradient>
+    <path id="${id}p" d="M0.4 0.45 C3.31 1.1 5.94 2.4 7.89 4.05 C8.9 4.9 10.3 5.55 11.3 4.75 C12.6 3.7 14 2.6 15.71 1.9 C15.2 3.95 13.94 5.95 12.29 7.5 C11.83 10.6 10.63 14.8 9.83 19.6 C8.69 14.7 6.23 10.4 6.8 6.1 C4.95 4.45 2.75 2.25 0.4 0.45 Z"/>
   </defs>
-  <path d="M2.4 3.2 L9.1 7.1 L8.3 8.4 Z" fill="url(#${id}a)"/>
-  <path d="M9.3 6.6 C11.3 6.4 12.9 7.7 13.1 9.6 C13.3 11.6 12.3 13.5 11.4 15.6 L10.5 20.8 C9.9 18.5 9.5 16.1 9.1 13.7 C8.0 12.5 7.6 10.8 7.9 9.2 C8.1 7.9 8.5 6.9 9.3 6.6 Z" fill="url(#${id}b)"/>
-  <path d="M11.5 9.8 C13.9 6.7 17.5 4.6 21.7 4.3 C19.7 6.2 17.7 8.4 15.7 10.3 C14.7 11.2 13.5 11.8 12.4 12.0 Z" fill="url(#${id}a)"/>
+  <use href="#${id}p" fill="url(#${id}b)"/><use href="#${id}p" fill="url(#${id}a)"/><use href="#${id}p" fill="url(#${id}c)"/>
 </svg>`;
 }
 
@@ -32,7 +40,7 @@ export function logoMarkSVG(size = 24) {
 export function createLogo({ size = 22, gradient = false } = {}) {
   const el = document.createElement('div');
   el.className = 'ss-logo' + (gradient ? ' ss-logo--grad' : '');
-  el.style.cssText = `display:inline-flex;align-items:center;gap:${(size * 0.28).toFixed(1)}px;font-family:'Open Sans',sans-serif;font-weight:400;font-size:${size}px;line-height:1;letter-spacing:-0.005em;color:var(--ss-wordmark);white-space:nowrap;`;
+  el.style.cssText = `display:inline-flex;align-items:center;gap:${(size * 0.42).toFixed(2)}px;font-family:'Open Sans',sans-serif;font-weight:400;font-size:${size}px;line-height:1;letter-spacing:-0.005em;color:var(--ss-wordmark);white-space:nowrap;`;
   el.innerHTML = `${logoMarkSVG(Math.round(size * 1.12))}<span class="ss-word">SOL Sniper</span>`;
   if (gradient) {
     const w = el.querySelector('.ss-word');

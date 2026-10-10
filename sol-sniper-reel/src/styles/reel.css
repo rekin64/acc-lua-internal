@@ -6,7 +6,7 @@ html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
 }
 .shot { position: absolute; inset: 0; overflow: hidden; display: none; }
 .shot.on { display: block; }
-.rig { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.rig { position: absolute; left: 0; top: 0; transform-origin: 0 0; } /* no will-change: it freezes the raster scale (soft punch-ins) */
 .world-card { position: absolute; left: 0; top: 0; border-radius: 22px; overflow: hidden;
   box-shadow: 0 40px 120px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06); }
 .flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
@@ -22,7 +22,7 @@ html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
 .title { position: absolute; left: 88px; top: 0; width: 920px; transform-origin: 0 50%; }
 .title .ln { display: block; overflow: hidden; padding: 0.04em 0 0.06em; margin: -0.04em 0 -0.06em; }
 .title .in { display: inline-block; font-family: var(--font-ui); font-weight: 800; font-size: 138px; line-height: 0.96;
-  letter-spacing: -0.048em; color: #FFFFFF; text-transform: uppercase; white-space: nowrap; will-change: transform; }
+  letter-spacing: -0.048em; color: #FFFFFF; text-transform: uppercase; white-space: nowrap; }
 .title .grad { position: relative; }
 .title .grad .paint { position: absolute; left: 0; top: 0; color: transparent;
   background: linear-gradient(90deg, #8DA0F4 0%, #A58BEF 55%, #C18AEC 100%);
@@ -32,7 +32,7 @@ html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
 .super { position: absolute; left: 96px; width: 900px; z-index: 40; font-family: var(--font-ui); font-weight: 600; font-size: 78px; line-height: 1.06; letter-spacing: -0.038em; }
 .super .ln { display: block; white-space: nowrap; }
 .super .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.06em 0.02em 0.14em; margin: -0.06em -0.02em -0.14em; }
-.super .wi { display: inline-block; color: #111217; will-change: transform; }
+.super .wi { display: inline-block; color: #111217; }
 .super .dot { color: #6E5DBE; }
 .super--light .wi { color: #FFFFFF; }
 .super--light .dot { color: #B49BF2; }
@@ -40,7 +40,7 @@ html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
   background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.82) 26%, #FFFFFF 44%, #FFFFFF 100%); }
 
 /* Small persistent label during simulated trade footage */
-.sim-chip { position: absolute; left: 96px; top: 214px; z-index: 45; display: inline-flex; align-items: center; gap: 12px;
+.sim-chip { position: absolute; left: 96px; top: 1436px; z-index: 45; display: inline-flex; align-items: center; gap: 12px;
   padding: 12px 20px 12px 16px; border-radius: 999px; background: rgba(255,255,255,0.92);
   box-shadow: 0 0 0 1px rgba(20, 22, 40, 0.08), 0 8px 24px rgba(20, 22, 40, 0.10);
   font: 600 22px/1 var(--font-ui); letter-spacing: 0.06em; color: #4B4C57; text-transform: uppercase; opacity: 0; }
@@ -61,8 +61,8 @@ html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
 /* ---------- 6 · Outro ---------- */
 .outro-bg { position: absolute; inset: 0; background: #FFFFFF; }
 .outro-center { position: absolute; left: 0; right: 0; display: flex; justify-content: center; }
-.outro-cta { position: relative; display: inline-flex; align-items: center; justify-content: center; height: 128px; padding: 0 76px;
-  border-radius: 999px; background: var(--ss-grad-btn); color: #FFFFFF; font: 600 50px/1 var(--font-site); letter-spacing: -0.01em;
+.outro-cta { position: relative; display: inline-flex; align-items: center; justify-content: center; height: 140px; padding: 0 84px;
+  border-radius: 999px; background: var(--ss-grad-btn); color: #FFFFFF; font: 600 54px/1 var(--font-site); letter-spacing: -0.01em;
   box-shadow: 0 18px 40px rgba(90, 86, 189, 0.30), 0 4px 10px rgba(90, 86, 189, 0.18), inset 0 1px 0 rgba(255,255,255,0.18); }
 .outro-cta .hl { position: absolute; inset: 0; border-radius: inherit; background: #FFFFFF; opacity: 0; mix-blend-mode: soft-light; }
 .disclaimer { position: absolute; left: 120px; right: 120px; text-align: center; font: 500 23px/1.45 var(--font-ui);
