@@ -5,8 +5,9 @@ The edit runs the real footage at real speed, with three speed ramps:
   * 1.63-2.03 s  a short speed-up (peak 1.17x) through the camera's own pan to the box, so the lid
                  flies off on 2.47-2.57 and the box is fully open on the 2.60 beat
   * 2.60-3.47 s  a slow-motion dip (down to 0.46x) on the opened box
-  * 4.07-4.73 s  a slow-motion dip (down to 0.4x) on the hand lifting the next bundle, so that its
-                 push down into the box plays at real speed on 4.77-5.00, under the camera's whip
+  * 4.07-4.40 s  a short slow-motion dip (down to 0.6x) while the hand rests on the notes, so that the
+                 next bundle's swing (4.40-4.80) and its push down into the box (4.83-5.00) play at real
+                 speed, untouched source frames, and the cut lands as the notes hit the box
 Where the remap lands between two source frames, the in-between frame is synthesized with dense
 optical flow (OpenCV DIS, both directions), like an editor's optical-flow time remap; where the two
 warped neighbours disagree (occlusions), the nearer one is used instead of a double exposure.
@@ -34,11 +35,11 @@ FRAMES = 150  # 5.00 s at 30 fps
 RAMPS = [
     (49, 12, +1 / 6),       # pan to the box: +1 source frame
     (78, 26, -7 / 13),      # slow motion on the opened box: -7 source frames
-    (122, 20, -6 / 10),     # slow motion on the hand lifting the next bundle: -6 source frames
+    (122, 10, -2 / 5),      # short slow motion while the hand rests on the notes: -2 source frames
 ]
 
 # logo on the lid: template from source frame 62 (x, y, w, h), searched in source frames 54-76
-LOGO_REF, LOGO_TPL, LOGO_RANGE = 62, (435, 390, 280, 220), range(54, 77)
+LOGO_REF, LOGO_TPL, LOGO_RANGE = 62, (435, 390, 280, 220), range(54, 79)
 
 
 def remap(k):
@@ -79,7 +80,10 @@ def track_logo():
                 x, y, w, h = int(px + dx), int(py + dy), pw, ph
             else:
                 x, y, w, h = px, py, pw, ph
-        boxes[i] = (int(x), int(y), int(w), int(h))
+        # keep the full logo size (a smaller match box trails the motion-smeared print), centred on the match
+        cx, cy = x + w / 2, y + h / 2
+        w, h = max(w, w0), max(h, h0)
+        boxes[i] = (int(cx - w / 2), int(cy - h / 2), int(w), int(h))
     return boxes
 
 
@@ -89,7 +93,7 @@ def hide_logo(img, box):
     H, W = img.shape[:2]
     m = np.zeros((H, W), np.float32)
     pad = 26
-    cv2.rectangle(m, (x - pad, y - pad), (x + w + pad, y + h + pad), 1.0, -1)
+    cv2.rectangle(m, (x - pad, y - pad), (x + w + pad + 60, y + h + pad), 1.0, -1)  # + the smear's trailing side
     m = cv2.GaussianBlur(m, (0, 0), 18)
     ring = (cv2.GaussianBlur(m, (0, 0), 60) > 0.05) & (m < 0.02)
     f = img.astype(np.float32)
@@ -97,7 +101,7 @@ def hide_logo(img, box):
     sel = ring & (lum < 110)
     lid = np.median(f[sel], axis=0) if sel.sum() > 500 else np.median(f[ring], axis=0)
     soft = cv2.GaussianBlur(f, (0, 0), 28)
-    patch = 0.25 * soft + 0.75 * lid[None, None, :]
+    patch = 0.1 * soft + 0.9 * lid[None, None, :]
     out = f * (1 - m[..., None]) + patch * m[..., None]
     return np.clip(np.rint(out), 0, 255).astype(np.uint8)
 
@@ -158,6 +162,25 @@ for k in range(FRAMES):
         img = between(i, t)
     Image.fromarray(img).save(os.path.join(OUT, f'p_{k:04d}.jpg'), quality=97, subsampling=0)
     plan.append({'k': k, 'source': round(s, 3), 'synth': t > 0})
+# The source has one unusually sharp frame inside the fast pan (source 56, between motion-blurred neighbours);
+# it pops on screen. Give such outliers the horizontal motion blur of the pan around them.
+def sharpness(img):
+    return float(cv2.Laplacian(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY), cv2.CV_64F).var())
+
+
+PAN = range(50, 61)
+sharp = {k: sharpness(np.asarray(Image.open(os.path.join(OUT, f'p_{k:04d}.jpg')))) for k in range(PAN.start - 2, PAN.stop + 2)}
+for k in PAN:
+    ref = float(np.median([sharp[j] for j in (k - 2, k - 1, k + 1, k + 2)]))
+    if sharp[k] > 3 * ref:
+        img = np.asarray(Image.open(os.path.join(OUT, f'p_{k:04d}.jpg')))
+        for n in range(9, 61, 4):
+            out = cv2.blur(img, (n, 1))
+            if sharpness(out) <= 1.5 * ref:
+                break
+        Image.fromarray(out).save(os.path.join(OUT, f'p_{k:04d}.jpg'), quality=97, subsampling=0)
+        plan[k]['pan_blur_px'] = n
+
 json.dump({'plan': plan, 'logo': {str(i): b for i, b in sorted(LOGO.items())}}, open(os.path.join(OUT, 'map.json'), 'w'), indent=0)
 print(f'wrote {FRAMES} plate frames ({sum(p["synth"] for p in plan)} flow-synthesized, logo hidden in source '
       f'frames {min(LOGO)}-{max(LOGO)}) to {OUT}')

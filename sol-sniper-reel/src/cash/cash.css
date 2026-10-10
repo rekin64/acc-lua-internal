@@ -10,6 +10,8 @@ html, body { margin: 0; background: #000; overflow: hidden; }
 .cam .t0 { top: 0; }
 .cam .t1 { top: 1918px; transform: scaleY(-1); filter: blur(24px) brightness(0.5); } /* 2 px overlaps hide the seams */
 .cam .t2 { top: 3836px; filter: blur(24px) brightness(0.5); }
+/* the shadow of the box closing in on the push into it (last frames only) */
+.dive { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
 .vignette { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 90% 75% at 50% 50%, rgba(0,0,0,0) 58%, rgba(0,0,0,0.32) 100%); }
 /* keeps the white type readable over the light floor tiles */

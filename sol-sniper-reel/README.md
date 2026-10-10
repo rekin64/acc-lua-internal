@@ -56,12 +56,12 @@ python3 scripts/encode.py --frames out/intro_frames,out/frames --audio audio/sou
 | 0.00–1.63 | The notes fanned in the hand, from the very first frame, on the opening hit. "Wait…" punches in with the hit and "is this legal?" on the next accent |
 | 1.63–2.60 | Punch-in cut; the move to the box with a slight speed ramp. The lid flies off and the box is fully open on the 2.60 beat |
 | 2.60–4.03 | Zoom-out reveal of the box in slow motion, then a punch-in cut at 3.07 as the notes pour in at real speed; heartbeat punches |
-| 4.03–4.73 | Punch-in cut; slow motion as the hand lifts the next bundle (heartbeat punch at 4.53) |
-| 4.73–5.00 | Real speed: the hand pushes the bundle down into the box and the camera follows the push, tilting down and diving in (motion blur with a 360° shutter on the last frames) into the shadow of the box. Hard cut on the beat into the reel's dark title frame, whose type rises the same way, and its opening impact |
+| 4.03–4.70 | Punch-in cut; the hand rests on the notes (brief slow motion), then lifts the next bundle (heartbeat punch at 4.53) |
+| 4.70–5.00 | Real speed: the hand swings the bundle over and pushes it down into the box. The camera pushes in on the spot where the notes land (subtle motion blur, 360° shutter on the last frames) as the shadow of the box closes in. Cut on the action, on the beat, as the notes hit the box, into the reel's dark title frame and its opening impact |
 
 - **Footage:** `scripts/cash_frames.py` extracts the clip with the correct BT.709 colours. `scripts/cash_plate.py` retimes it into the 150-frame plate: the speed ramps, with in-between frames synthesized by optical flow (occlusion-aware, no double exposures). It also tracks the third-party logo on the shoe-box lid and blurs it into the lid.
 - **Scene:** `src/cash/` (`cash.js`, `cash.css`, `timing.js`).
-- **Sound:** `audio/build_intro.py` builds it from `audio/cash_intro_timing.json` (exported from `src/cash/timing.js`), with the same palette as the phone hook: a bass hit, the tension bed, text accents, heartbeat pulses on the cuts, whooshes on the moves, and a riser plus a suck that stop dead on the cut. It writes `audio/cash_intro/intro.wav` and `audio/cash_intro/soundtrack_with_intro.wav`. The reel's soundtrack follows bit for bit, so its own impact at 5.00 lands on the cut.
+- **Sound:** `audio/build_intro.py` builds it from `audio/cash_intro_timing.json` (exported from `src/cash/timing.js`), with the same palette as the phone hook: a bass hit, the tension bed, text accents (and a felt hit on the box reveal), heartbeat pulses on the cuts, whooshes on the moves, and a riser plus a suck that stop dead on the cut. It writes `audio/cash_intro/intro.wav` and `audio/cash_intro/soundtrack_with_intro.wav`. The reel's soundtrack follows bit for bit, so its own impact at 5.00 lands on the cut.
 - **Claims:** the hook adds no figures or claims. The footage is not presented as SOL Sniper results.
 
 ```bash

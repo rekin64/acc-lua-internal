@@ -9,10 +9,11 @@
 //  2.60-4.03  zoom-out reveal of the box in slow motion, punch-in cut at 3.07 as the notes pour in at
 //             real speed; heartbeat punches
 //  4.03       punch-in cut
-//  4.03-4.73  slow motion: the hand lifts the next bundle (heartbeat punch at 4.53)
-//  4.73-5.00  real speed: the hand pushes the bundle down into the box and the camera follows the push,
-//             tilting down and diving in (motion blur, 360° shutter on the last frames), into the shadow of
-//             the box: hard cut on the beat into the reel's dark title frame, whose type rises the same way
+//  4.03-4.70  the hand rests on the notes (brief slow motion), then lifts the next bundle (punch at 4.53)
+//  4.70-5.00  real speed: the hand swings the next bundle over and pushes it down into the box; the camera
+//             pushes in on the spot where the notes land (motion blur, 360° shutter on the last frames) as the
+//             shadow of the box closes in: cut on the action, on the beat, as the notes hit the box, into the
+//             reel's dark title frame and its opening impact
 //
 // Render contract (scripts/render.mjs --page src/cash/index.html --timing src/cash/timing.js):
 //   window.__ready (Promise), window.__render(t) -> Promise (the plate frame is decoded before capture).
@@ -22,6 +23,7 @@ import { FPS, DURATION, G, CUT1, REVEAL, CUT2, CUT3, FOLLOW, WHIP } from './timi
 const PLATE = '../../out/cash/plate/';
 const PLATE_FRAMES = 150;
 const LINE2 = 0.6; // "is this legal?" (accent cue)
+const LAND = { x: 290, y: 740 }; // where the bundle goes into the box (source px, frames 139-141)
 
 /** Beat punch-in: a 1.5-frame push in, then an eased release. */
 function punch(t, t0, amt, rel = 0.42) {
@@ -53,17 +55,21 @@ function camera(t) {
     // punch-in cut: a pure zoom around the frame centre (same source point as before the cut)
     S = lerp(1.22, 1.25, ease.inOutSine(prog(t, CUT3, DURATION))) * (1 + punch(t, FOLLOW, 0.03));
     fx = 560; fy = lerp(860, 900, ease.inOutSine(prog(t, CUT3, WHIP)));
-    // the camera follows the hand's push down into the box: it tilts down (the frame moves up), a little
-    // left with the hand (the frame moves right), and dives in; the move accelerates into the cut
-    const p = prog(t, WHIP, DURATION);
-    S *= lerp(1, 1.28, ease.inCubic(p));
-    dy = -800 * Math.pow(p, 3);
-    dx = 90 * p * p;
   }
-  // keep the frame covered by the footage (the whip offset is covered by the mirrored tiles)
-  const tx = Math.min(0, Math.max(1080 - 1080 * S, 540 - fx * S));
-  const ty = Math.min(0, Math.max(1920 - 1920 * S, 960 - fy * S));
-  return { S, x: tx + dx, y: ty + dy };
+  // keep the frame covered by the footage
+  let tx = Math.min(0, Math.max(1080 - 1080 * S, 540 - fx * S));
+  let ty = Math.min(0, Math.max(1920 - 1920 * S, 960 - fy * S));
+  const lx = tx + LAND.x * S, ly = ty + LAND.y * S; // the landing spot on screen
+  if (t >= WHIP) {
+    // cut on the action: as the hand swings the bundle over and pushes it down into the box, the camera
+    // pushes in on the spot where the notes land (held in place on screen, so it stays a push, not a pan)
+    // and drifts down with the hand; the move accelerates into the cut, which lands as the notes hit the box
+    const p = prog(t, WHIP, DURATION);
+    S *= lerp(1, 1.42, ease.inCubic(p));
+    tx = lx - LAND.x * S;
+    ty = ly - LAND.y * S - 120 * Math.pow(p, 3);
+  }
+  return { S, x: tx + dx, y: ty + dy, lx, ly };
 }
 
 const stage = document.getElementById('stage');
@@ -71,9 +77,10 @@ const cam = h(`<div class="cam"><img class="t0"><img class="t1"><img class="t2">
 const tiles = [...cam.querySelectorAll('img')];
 const vignette = h(`<div class="vignette"></div>`);
 const shade = h(`<div class="topshade"></div>`);
+const dive = h(`<div class="dive"></div>`);
 const hook = h(`<div class="hook"><span class="ln">Wait…</span><span class="ln">is this legal?</span></div>`);
 const lines = [...hook.querySelectorAll('.ln')];
-stage.append(cam, vignette, shade, hook);
+stage.append(cam, vignette, dive, shade, hook);
 
 // plate frames: fetched once per output frame, shared by the three tiles via a blob URL
 let shown = -1, blobUrl = null;
@@ -110,9 +117,13 @@ function render(t) {
     css(lines[i], 'filter', b > 0.05 && t >= t0 ? `blur(${b.toFixed(2)}px)` : 'none');
   });
 
-  // ---- exposure bridge: the whip dives into the shadow of the box, toward the reel's dark title frame
-  const ex = ease.inQuad(prog(t, 4.78, DURATION));
-  css(cam, 'filter', `contrast(1.05) saturate(1.06) brightness(${(1 - 0.72 * ex).toFixed(4)})`);
+  // ---- exposure bridge: the push goes into the shadow of the box (it closes in around the landing spot,
+  // softly, from the edges), toward the reel's dark title frame
+  const ex = ease.inQuad(prog(t, 4.8, DURATION));
+  css(cam, 'filter', `contrast(1.05) saturate(1.06) brightness(${(1 - 0.45 * ex).toFixed(4)})`);
+  const r0 = lerp(700, 260, ex);
+  css(dive, 'opacity', ex.toFixed(4));
+  css(dive, 'background', `radial-gradient(circle at ${c.lx.toFixed(1)}px ${c.ly.toFixed(1)}px, rgba(0,0,0,0) ${r0.toFixed(1)}px, rgba(0,0,0,0.9) ${(r0 + 900).toFixed(1)}px)`);
 
   // ---- the footage frame for this output frame (frame-locked across motion-blur sub-samples)
   return showPlate(Math.min(PLATE_FRAMES - 1, Math.floor(t * FPS + 1e-6)));

@@ -16,14 +16,14 @@ export const REVEAL = G(5); // 2.600  the box is open: zoom-out reveal (the lid 
 export const CUT2 = G(4);   // 3.067  punch-in cut on the static box, the notes start pouring in
 export const CUT3 = G(2);   // 4.033  punch-in cut: the hand brings the next bundle
 export const FOLLOW = G(1); // 4.533  heartbeat punch on the hand lifting the next bundle (slow motion)
-export const WHIP = snap(4.7); // the push down into the box starts: the camera follows it into the whip
+export const WHIP = snap(4.7); // the swing + push into the box: the camera pushes in on the landing spot
 
 export const SECTIONS = {
   open:    { start: 0.0, end: CUT1 },     // the notes fanned in the hand, "Wait..." / "is this legal?"
   move:    { start: CUT1, end: REVEAL },  // speed ramp through the camera's pan to the box, lid off
   box:     { start: REVEAL, end: CUT3 },  // slow-motion reveal of the box, then the notes pour in
-  push:    { start: CUT3, end: FOLLOW },  // the next bundle, slow motion
-  handoff: { start: FOLLOW, end: DURATION }, // the push down into the box, the camera follows it into the whip
+  push:    { start: CUT3, end: FOLLOW },  // the hand rests on the notes, brief slow motion
+  handoff: { start: FOLLOW, end: DURATION }, // the push down into the box, cut on the action
 };
 
 // Sound cues (audio/build_intro.py vocabulary; riser / suck END at t, everything else starts at t).
@@ -37,12 +37,13 @@ export const CUES = [
   { t: G(6), type: 'pulse', gain: -8 },
   { t: 2.4, type: 'whoosh', dur: 0.25, gain: -3 },  // the lid flies off (peaks ~2.55)
   { t: REVEAL, type: 'pulse', gain: -6 },
+  { t: REVEAL, type: 'accent', gain: -5 },      // the box is open: a felt hit on the reveal
   { t: CUT2, type: 'pulse', gain: -5 },
   { t: G(3), type: 'pulse', gain: -4 },
-  { t: CUT3, type: 'pulse', gain: -3 },
+  { t: CUT3, type: 'pulse', gain: -2 },
   { t: FOLLOW, type: 'pulse', gain: -2 },
   { t: DURATION, type: 'riser', dur: 1.6 },     // build into the reel's opening impact
-  { t: DURATION, type: 'suck', dur: 0.5 },      // follows the push and the whip, stops dead on the cut
+  { t: DURATION, type: 'suck', dur: 0.6, gain: 1.5 }, // follows the push into the box, stops dead on the cut
 ];
 
 // Extra motion-blur sub-frames for camera moves: [start, end, samples]
@@ -55,8 +56,8 @@ export const FAST_MOTION = [
   [2.6, 3.06, 16],    // zoom-out reveal of the box
   [3.55, 3.72, 12],   // beat punch
   [4.52, 4.7, 12],    // beat punch
-  [4.7, 4.8, 24],     // the camera starts following the push
-  [4.8, 5.0, 64],     // whip (~5 frames of motion blur)
+  [4.7, 4.8, 24],     // the push-in starts
+  [4.8, 5.0, 48],     // the push-in accelerates into the cut
 ];
 export const samplesFor = (frame, base = 4, fastMax = 64) => {
   const t = frame / FPS;
@@ -64,5 +65,5 @@ export const samplesFor = (frame, base = 4, fastMax = 64) => {
   for (const [a, b, k] of FAST_MOTION) if (t >= a && t < b) n = Math.max(n, Math.min(k, fastMax));
   return n;
 };
-/** 360° shutter on the whip frames, so each frame's streak reaches the next frame's (no stepping). */
+/** 360° shutter on the push-in frames, so each frame's streak reaches the next frame's (no stepping). */
 export const shutterFor = (frame, def = 0.5) => (frame >= 143 ? 1.0 : def);
