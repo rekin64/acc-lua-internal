@@ -2,7 +2,9 @@
 
 A vertical 1080×1920 reel for Instagram Reels and TikTok, exactly 15.0 s long at 30 fps (H.264 + AAC). It is built like a real product-demo edit: the SOL Sniper landing page and trading terminal are rebuilt as crisp vector UI, then "filmed" with a virtual camera. That camera does punch-ins, whip pans, and speed ramps, with real motion blur, while a cursor clicks through a trade. The soundtrack and sound design are synthesized and cut to the same 125 BPM grid as the picture.
 
-**Final video:** `dist/sol-sniper-reel.mp4`
+**Final videos:**
+- `dist/sol-sniper-reel-with-intro.mp4` (20.0 s): the 5 s "Wait... is this legal?" hook followed by the unchanged reel
+- `dist/sol-sniper-reel.mp4` (15.0 s): the reel on its own
 
 ## Storyboard (as cut)
 
@@ -23,6 +25,26 @@ All trading moments are presented as a **simulated demo**:
 Returns are kept modest: GLINT is about +10–13%, MOCHI +8%, and one loss is shown (ZORP −4.1%). The take-profit at +30% matches the app's Auto-sell setting (TP +30% · SL −15%). A sniper's chart starts at the token's launch (15 s candles), and the whip on the drop reads as a time jump.
 
 **Before running it as a paid ad:** Meta's crypto-advertising policy applies to the advertiser. Repeat the disclaimer in the post caption.
+
+## Intro hook (5 s, prepended)
+
+| Time | What happens |
+|---|---|
+| 0.00–0.40 | Black, deep bass hit, tension starts |
+| 0.40 / 0.80 | "Wait..." then "is this legal?" punch in on the sound accents (centred, Inter ExtraBold, soft glow) |
+| 1.20–2.80 | The phone from the client photo rises out of the dark and the type glides up above it; slow cinematic push-in |
+| 2.80–4.20 | One continuous speed ramp with subtle parallax (phone vs. dashboard), a fine light sweep and a green glow on the profit figures on the heartbeat pulses |
+| 4.20–5.00 | The type flies past the camera; the push lands on "$815,122.73" exactly where the reel's "MEMECOIN" title appears, then a hard cut on the beat into the reel's opening impact (match cut) |
+
+- **Plates:** `scripts/intro_plates.py` splits the photo (`assets/source/intro-reference.png`) into layers, removing its burned-in text and the iOS bar on the way. The layers are a background, a cut-out phone, a screen bloom and a profit glow, saved in `assets/intro/`.
+- **Scene:** the hook itself is `src/intro/` (`intro.js`, `intro.css`, `timing.js`).
+- **Sound:** `audio/build_intro.py` (with `sndkit/intro_fx.py`) synthesizes the hook's sound design. It writes `audio/intro.wav` and `audio/soundtrack_with_intro.wav`; the reel's 15 s soundtrack is copied in bit for bit.
+
+```bash
+python3 -I scripts/intro_plates.py && python3 audio/build_intro.py
+node scripts/render.mjs --page src/intro/index.html --timing src/intro/timing.js --out out/intro_frames
+python3 scripts/encode.py --frames out/intro_frames,out/frames --audio audio/soundtrack_with_intro.wav --out dist/sol-sniper-reel-with-intro.mp4
+```
 
 ## How it's built
 
