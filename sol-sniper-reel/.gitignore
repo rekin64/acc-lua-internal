@@ -4,3 +4,4 @@ audio/stems/
 *.log
 audio/*.png
 audio/sndkit/__pycache__/
+audio/__pycache__/
