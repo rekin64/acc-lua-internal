@@ -8,15 +8,16 @@
 //             is fully open on the 2.60 beat
 //  2.60-4.03  zoom-out reveal of the box in slow motion, punch-in cut at 3.07 as the notes pour in at
 //             real speed; heartbeat punches
-//  4.03-4.53  punch-in cut: the hand brings the next bundle
-//  4.53-5.00  the hand pushes the bundle down into the box and the camera follows it, accelerating into a
-//             downward whip (mirrored edges, motion blur on the last ~5 frames) that dives into the shadow
-//             of the box: hard cut on the beat into the reel's dark title frame and its impact
+//  4.03       punch-in cut
+//  4.03-4.73  slow motion: the hand lifts the next bundle (heartbeat punch at 4.53)
+//  4.73-5.00  real speed: the hand pushes the bundle down into the box and the camera follows the push,
+//             tilting down and diving in (motion blur, 360° shutter on the last frames), into the shadow of
+//             the box: hard cut on the beat into the reel's dark title frame, whose type rises the same way
 //
 // Render contract (scripts/render.mjs --page src/cash/index.html --timing src/cash/timing.js):
 //   window.__ready (Promise), window.__render(t) -> Promise (the plate frame is decoded before capture).
 import { lerp, prog, ease, css, h } from '../lib/engine.js';
-import { FPS, DURATION, G, CUT1, REVEAL, CUT2, CUT3, FOLLOW } from './timing.js';
+import { FPS, DURATION, G, CUT1, REVEAL, CUT2, CUT3, FOLLOW, WHIP } from './timing.js';
 
 const PLATE = '../../out/cash/plate/';
 const PLATE_FRAMES = 150;
@@ -42,20 +43,22 @@ function camera(t) {
     S = lerp(1.12, 1.15, prog(t, CUT1, REVEAL)) * (1 + punch(t, G(6), 0.03));
     fy = 980;
   } else if (t < CUT2) {
-    const r = ease.outCubic(prog(t, REVEAL, REVEAL + 0.62));         // zoom-out reveal of the box
-    S = lerp(1.24, 1.07, r) * lerp(1, 1.025, ease.inOutSine(prog(t, REVEAL + 0.62, CUT2)));
+    const r = ease.outCubic(prog(t, REVEAL, REVEAL + 0.45));         // zoom-out reveal of the box
+    S = lerp(1.24, 1.08, r);
     fx = 560; fy = 820;
   } else if (t < CUT3) {
     S = lerp(1.13, 1.16, ease.inOutSine(prog(t, CUT2, CUT3))) * (1 + punch(t, G(3), 0.035));
     fx = 560; fy = 860;
   } else {
-    S = lerp(1.17, 1.19, ease.inOutSine(prog(t, CUT3, FOLLOW))) * (1 + punch(t, FOLLOW, 0.03));
-    fx = 560; fy = 900;
-    // the hand's push carries on as the whip: the frame accelerates downward, slightly left like the hand
-    const p = prog(t, FOLLOW, DURATION);
-    S *= lerp(1, 1.05, ease.inQuad(p));
-    dy = 2200 * Math.pow(p, 4);
-    dx = -60 * p * p;
+    // punch-in cut: a pure zoom around the frame centre (same source point as before the cut)
+    S = lerp(1.22, 1.25, ease.inOutSine(prog(t, CUT3, DURATION))) * (1 + punch(t, FOLLOW, 0.03));
+    fx = 560; fy = lerp(860, 900, ease.inOutSine(prog(t, CUT3, WHIP)));
+    // the camera follows the hand's push down into the box: it tilts down (the frame moves up), a little
+    // left with the hand (the frame moves right), and dives in; the move accelerates into the cut
+    const p = prog(t, WHIP, DURATION);
+    S *= lerp(1, 1.28, ease.inCubic(p));
+    dy = -800 * Math.pow(p, 3);
+    dx = 90 * p * p;
   }
   // keep the frame covered by the footage (the whip offset is covered by the mirrored tiles)
   const tx = Math.min(0, Math.max(1080 - 1080 * S, 540 - fx * S));
@@ -101,15 +104,15 @@ function render(t) {
   css(shade, 'opacity', t >= REVEAL ? '0' : (1 - exit).toFixed(3));
   [0, LINE2].forEach((t0, i) => {
     const pin = ease.outCubic(prog(t, t0, t0 + 0.3));
-    const b = lerp(7, 0, ease.outCubic(prog(t, t0, t0 + 0.18)));
+    const b = i === 0 ? 0 : lerp(5, 0, ease.outCubic(prog(t, t0, t0 + 0.16))); // frame 0 (the cover) is sharp
     css(lines[i], 'opacity', t >= t0 ? '1' : '0'); // full on the accent frame
-    css(lines[i], 'transform', `scale(${lerp(1.14, 1, pin).toFixed(4)})`);
+    css(lines[i], 'transform', `scale(${lerp(1.08, 1, pin).toFixed(4)})`);
     css(lines[i], 'filter', b > 0.05 && t >= t0 ? `blur(${b.toFixed(2)}px)` : 'none');
   });
 
   // ---- exposure bridge: the whip dives into the shadow of the box, toward the reel's dark title frame
   const ex = ease.inQuad(prog(t, 4.78, DURATION));
-  css(cam, 'filter', `contrast(1.05) saturate(1.06) brightness(${(1 - 0.5 * ex).toFixed(4)})`);
+  css(cam, 'filter', `contrast(1.05) saturate(1.06) brightness(${(1 - 0.72 * ex).toFixed(4)})`);
 
   // ---- the footage frame for this output frame (frame-locked across motion-blur sub-samples)
   return showPlate(Math.min(PLATE_FRAMES - 1, Math.floor(t * FPS + 1e-6)));

@@ -427,18 +427,32 @@ def analyse(timing, body_timing, paths, bed, sfx, info, minfo, aac, use_ffmpeg, 
     on_mix = np.unique(np.concatenate([on_mix_b, on_mix_h]))
     w('  stem = the transient cues alone (dry + their reverb); mix = intro.wav as written. Detectors: broadband '
       '(HP 120 Hz) and low band (< 250 Hz, for the sub pulses)')
-    w('  t (s)    type        gain   stem dev (ms)  stem low (ms)   mix dev (ms)   mix low (ms)')
-    worst_stem, worst_mix = 0.0, 0.0
+    # masking: a transient whose first 10 ms sit within 6 dB of the sustained layers around it (whooshes, riser,
+    # suck, the bed) has no energy-ratio onset in the mix, so a blind detector cannot place it there. Such cues
+    # are reported as masked and judged on the stem (which isolates them), not on the mix.
+    masker = sum((info['per_cue'][i][0] for i, c in enumerate(cues) if c['type'] not in IFX.TRANSIENT_TYPES),
+                 np.zeros_like(hook))
+    rms = lambda x, a, b: float(np.sqrt(np.mean(x[:, max(a, 0):b] ** 2)) + 1e-12)
+    w('  t (s)    type        gain   stem dev (ms)  stem low (ms)   mix dev (ms)   mix low (ms)   masker re cue')
+    worst_stem, worst_mix, masked = 0.0, 0.0, []
     f = lambda d: f'{d * 1000:+9.2f}' if d is not None else '      n/a'
     for i, c in trans:
         ds, dsl = R.match(on_stem, c['t']), R.match(on_stem_lo, c['t'])
         dm, dml = R.match(on_mix, c['t']), R.match(on_mix_l, c['t'])
         best_s = min([abs(v) for v in (ds, dsl) if v is not None], default=np.inf)
         best_m = min([abs(v) for v in (dm, dml) if v is not None], default=np.inf)
-        worst_stem, worst_mix = max(worst_stem, best_s), max(worst_mix, best_m)
-        w(f"  {c['t']:6.3f}   {c['type']:10s} {c.get('gain', 0):+4.0f}   {f(ds)}      {f(dsl)}      {f(dm)}      {f(dml)}")
-    w(f"  bass_hit / accent / pulse: max |dev| (best detector) stem {worst_stem * 1000:.2f} ms, mix {worst_mix * 1000:.2f} ms "
-      f"-> {'PASS (< 2 ms)' if worst_stem < 0.002 and worst_mix < 0.002 else 'FAIL'}")
+        s0, d10 = ns(c['t']), ns(0.010)
+        mr = 20 * np.log10(rms(masker, s0 - d10, s0 + d10) / rms(info['per_cue'][i][0], s0, s0 + d10))
+        is_masked = mr > -6.0 and best_m >= 0.002
+        if is_masked:
+            masked.append(c['t'])
+        worst_stem = max(worst_stem, best_s)
+        worst_mix = worst_mix if is_masked else max(worst_mix, best_m)
+        w(f"  {c['t']:6.3f}   {c['type']:10s} {c.get('gain', 0):+4.0f}   {f(ds)}      {f(dsl)}      {f(dm)}      {f(dml)}"
+          f"      {mr:+6.1f} dB{'  masked' if is_masked else ''}")
+    w(f"  bass_hit / accent / pulse: max |dev| (best detector) stem {worst_stem * 1000:.2f} ms, mix {worst_mix * 1000:.2f} ms"
+      + (f" (masked, judged on the stem: {', '.join(f'{t:.3f}' for t in masked)} s)" if masked else '')
+      + f" -> {'PASS (< 2 ms)' if worst_stem < 0.002 and worst_mix < 0.002 else 'FAIL'}")
     # end-aligned
     w('  END-ALIGNED cues (isolated dry render as placed in the hook; must end ON the cue sample = the cut):')
     worst = 0.0

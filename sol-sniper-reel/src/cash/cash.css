@@ -2,20 +2,21 @@
 html, body { margin: 0; background: #000; overflow: hidden; }
 #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #000;
   font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-/* the footage, "filmed" by a virtual camera; the two mirrored tiles above it only show during the whip */
+/* the footage, "filmed" by a virtual camera; the mirrored tiles below it can only show in the last whip frames,
+   blurred and dark (they read as the shadow of the box, never as a copy of the picture) */
 .cam { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 0 0;
   filter: contrast(1.05) saturate(1.06); }
 .cam img { position: absolute; left: 0; width: 1080px; height: 1920px; display: block; }
 .cam .t0 { top: 0; }
-.cam .t1 { top: -1918px; transform: scaleY(-1); } /* 2 px overlaps hide the tile seams */
-.cam .t2 { top: -3836px; }
+.cam .t1 { top: 1918px; transform: scaleY(-1); filter: blur(24px) brightness(0.5); } /* 2 px overlaps hide the seams */
+.cam .t2 { top: 3836px; filter: blur(24px) brightness(0.5); }
 .vignette { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 90% 75% at 50% 50%, rgba(0,0,0,0) 58%, rgba(0,0,0,0.32) 100%); }
 /* keeps the white type readable over the light floor tiles */
 .topshade { position: absolute; left: 0; right: 0; top: 0; height: 1050px; pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.3) 28%, rgba(0,0,0,0.12) 52%, rgba(0,0,0,0) 100%); }
+  background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.38) 28%, rgba(0,0,0,0.26) 52%, rgba(0,0,0,0) 100%); }
 .hook { position: absolute; left: 0; right: 0; top: 0; text-align: center; transform-origin: 540px 0; }
 .hook .ln { display: block; font-weight: 800; font-size: 140px; line-height: 0.9; letter-spacing: -0.05em; color: #FFFFFF;
   white-space: nowrap; transform-origin: 50% 60%;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.28), 0 8px 34px rgba(0,0,0,0.42), 0 0 60px rgba(0,0,0,0.18); }
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 0 18px rgba(0,0,0,0.45), 0 8px 34px rgba(0,0,0,0.42), 0 0 60px rgba(0,0,0,0.18); }
 .hook .ln:first-child { font-size: 158px; }

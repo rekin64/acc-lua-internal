@@ -67,7 +67,7 @@ cmd = [
     '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-framerate', str(fps), '-i', '-',
     '-ss', f'{first / fps:.4f}', '-i', audio,
     '-map', '0:v', '-map', '1:a',
-    '-vf', 'scale=in_range=full:out_range=tv:out_color_matrix=bt709,format=yuv420p',
+    '-vf', 'scale=in_range=full:out_range=tv:out_color_matrix=bt709,format=yuv420p,setsar=1',  # square pixels, written in the stream
     '-c:v', 'libx264', '-preset', 'slow', '-crf', str(crf), '-profile:v', 'high', '-level:v', '4.2',
     '-g', str(fps), '-bf', '2',
     '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',

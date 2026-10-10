@@ -14,11 +14,14 @@ import { launch, openPage } from './browser.mjs';
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : def; };
 // --timing lets another page (e.g. the intro hook) bring its own FPS / DURATION / blur windows
-const { FPS, DURATION, samplesFor } = await import(path.resolve(ROOT, opt('timing', 'src/timing.js')));
+const timing = await import(path.resolve(ROOT, opt('timing', 'src/timing.js')));
+const { FPS, DURATION, samplesFor } = timing;
 const WORKERS = Number(opt('workers', Math.max(1, Math.min(6, os.cpus().length))));
 const SAMPLES = Number(opt('samples', 4));
 const FAST_SAMPLES = Number(opt('fast-samples', 48)); // cap for timing.js FAST_MOTION windows
 const SHUTTER = Number(opt('shutter', 0.5)); // fraction of the frame interval the shutter is open
+// a timing module may open the shutter wider on some frames (e.g. 360° on a whip, so the streaks join up)
+const shutterFor = timing.shutterFor || ((k, def) => def);
 const TOTAL = Math.round(DURATION * FPS);
 const FROM = Number(opt('from', 0));
 const TO = Number(opt('to', TOTAL));
@@ -40,7 +43,7 @@ async function worker(w) {
       const k = frames[i];
       const n = SAMPLES > 1 ? samplesFor(k, SAMPLES, FAST_SAMPLES) : 1;
       for (let j = 0; j < n; j++) {
-        const t = k / FPS + (n > 1 ? (j / n) * (SHUTTER / FPS) : 0);
+        const t = k / FPS + (n > 1 ? (j / n) * (shutterFor(k, SHUTTER) / FPS) : 0);
         const file = path.join(OUT, `f${String(k).padStart(4, '0')}_${j}.png`);
         if (fs.existsSync(file) && args.includes('--resume')) continue;
         await page.evaluate((t) => window.__render(t), t);
