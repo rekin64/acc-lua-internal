@@ -15,7 +15,9 @@ Form (beats):
                     the body). Fm9 (2) -> Db (1) -> Eb (1) -> Cm7 (1) (harmonic rhythm follows the cuts)
   25-26   break     everything cuts on a stab throw (delay + reverb tail)
   26-     outro     Dbmaj9 -> Abmaj9 (at the CTA reveal) in open voicings: warm keys + wide pad + sub,
-                    the Ab pad's filter opens and a soft top line blooms (resolve bright), rings out
+                    the Ab pad's filter opens and a soft top line blooms (resolve bright). The Ab chord
+                    (pad, sub, keys, top line) is held THROUGH the end of the reel: it stays present
+                    to ~14.85 s and the master's 150 ms end fade takes it to digital silence at 15.000
 
 Sidechain depth follows kick velocity. Arrangement rules that keep the frame-snapped SFX cues
 (up to 13 ms off the grid) clear of flams are in build_music().
@@ -71,9 +73,9 @@ def hum(*key, lo=0.88, hi=1.0):
     return float(rng('hum', *key).uniform(lo, hi))
 
 
-UI_CUES = ('click', 'tap_soft', 'tick', 'ui_blip', 'success', 'toast')
-POINTER_CUES = ('click', 'tap_soft', 'ui_blip')  # sharp pointer/UI transients a clap would flam with
-HIT_CUES = ('hit_cut', 'impact_big', 'impact_drop', 'impact_outro')
+UI_CUES = ('click', 'click_final', 'tap_soft', 'tick', 'ui_blip', 'success', 'toast')
+POINTER_CUES = ('click', 'click_final', 'tap_soft', 'ui_blip')  # sharp pointer/UI transients a clap would flam with
+HIT_CUES = ('hit_cut', 'punch', 'impact_big', 'impact_drop', 'impact_outro')
 
 
 def build_music(n_total, ir_hall, ir_room, cues=()):
@@ -189,7 +191,8 @@ def build_music(n_total, ir_hall, ir_room, cues=()):
     # outro: sustained sub, Db -> Ab
     # (the outro impact's sub drop lands on Db1, so the Db2 bass swells in under it instead of beating against it)
     add_at(T['bass'], I.bass_note(37, 0.96 + 0.4, 0.62, mid=0.18, attack=0.35, release=0.25, decay=3.0), bs(26))
-    add_at(T['bass'], I.bass_note(32, 1.1, 0.62, mid=0.16, attack=0.05, release=0.4, decay=1.6), bs(28))
+    # the Ab sub holds to the end of the reel (note-off 14.94 s; the master end fade closes it)
+    add_at(T['bass'], I.bass_note(32, 1.5, 0.62, mid=0.16, attack=0.05, release=0.3, decay=2.6), bs(28))
 
     # ------------------------------------------------------------------ arp
     def arp_section(b0, b1, cut0, cut1, vel0, vel1, decay=0.15):
@@ -236,12 +239,14 @@ def build_music(n_total, ir_hall, ir_room, cues=()):
     # reveal (resolve bright), low mids trimmed so the chord doesn't box up under the end card
     outro_eq = lambda x: eq(x, 'peak', 300.0, 1.0, -3.0)
     put_pad(26, 28.1, CHORDS['Dbmaj9']['pad'], 0.55, 0.06, 0.45, 3000.0, seed=26, hp_f=110.0, post=outro_eq)
-    put_pad(28, 29.6, CHORDS['Abmaj9']['pad'], 0.58, 0.2, 1.3,
+    # the last chord is held past the end of the reel (no release inside the picture): it stays
+    # present to the final frame and the master's 150 ms end fade closes it at 15.000 s
+    put_pad(28, 31.6, CHORDS['Abmaj9']['pad'], 0.58, 0.2, 0.3,
             lambda t: 2600.0 * (5200.0 / 2600.0) ** np.clip(t / 1.2, 0, 1), seed=28, hp_f=110.0, post=outro_eq,
             stages=1)
     # soft top line: upper chord tones two octaves up + a breath of air, blooming on the CTA reveal
     add_at(T['air'], I.shimmer([84, 87, 92], 0.96, attack=0.5, release=0.4, seed=26, air=0.25), bs(26))
-    add_at(T['air'], I.shimmer([87, 91, 94, 96], 1.0, attack=0.35, release=1.1, seed=28, air=0.8), bs(28))
+    add_at(T['air'], I.shimmer([87, 91, 94, 96], 1.4, attack=0.35, release=0.6, seed=28, air=0.8), bs(28))
 
     # ------------------------------------------------------------------ stabs
     for b in range(13, 25):
@@ -263,7 +268,7 @@ def build_music(n_total, ir_hall, ir_room, cues=()):
         return eq(eq(x, 'peak', 300.0, 1.0, -3.0), 'highshelf', 6000.0, 0.7, 2.0)
 
     add_at(T['keys'], keys_post(I.keys(CHORDS['Dbmaj9']['keys'], 1.2, 0.55, seed=26, lp_f=6500.0, hp_f=90.0)), bs(26))
-    add_at(T['keys'], keys_post(I.keys(CHORDS['Abmaj9']['keys'], 1.56, 0.55, seed=28, lp_f=7500.0, hp_f=90.0)), bs(28))
+    add_at(T['keys'], keys_post(I.keys(CHORDS['Abmaj9']['keys'], 1.9, 0.55, seed=28, lp_f=7500.0, hp_f=90.0)), bs(28))
 
     # ------------------------------------------------------------------ reverse swell into groove_a
     src_n = ns(0.3)
