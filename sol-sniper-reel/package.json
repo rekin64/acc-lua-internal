@@ -1,0 +1,19 @@
+{
+  "name": "sol-sniper-reel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "15s vertical (1080x1920) product-demo reel for SOL Sniper. HTML/CSS motion graphics rendered frame-by-frame with Playwright, soundtrack synthesized in Python, encoded with ffmpeg.",
+  "type": "module",
+  "scripts": {
+    "audio": "python3 audio/build_audio.py",
+    "snap": "node scripts/snap.mjs",
+    "frames": "node scripts/render.mjs",
+    "encode": "python3 scripts/encode.py",
+    "render": "npm run audio && npm run frames && npm run encode"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.1.0",
+    "@fontsource/open-sans": "^5.1.0",
+    "playwright": "1.56.1"
+  }
+}

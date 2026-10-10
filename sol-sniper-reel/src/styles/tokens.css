@@ -1,0 +1,43 @@
+/* SOL Sniper brand tokens — sampled from assets/source/site-cropped.png */
+:root {
+  /* Headline gradient stops (top -> bottom), sampled from "AI / Memecoin / Trading." */
+  --ss-blue:   #3956A4;
+  --ss-indigo: #5A56BD;
+  --ss-violet: #6E5DBE;
+  --ss-purple: #9B65D2;
+  --ss-lilac:  #AC6AD9;
+  --ss-wordmark: #5468D4;      /* "SOL Sniper" wordmark in the nav */
+  --ss-badge-bg: #F0EEFB;      /* "New" badge background */
+  --ss-badge-ink: #7D72C9;
+
+  --ss-grad-head: linear-gradient(180deg, #3956A4 0%, #6E5DBE 52%, #AC6AD9 100%);
+  --ss-grad-btn:  linear-gradient(180deg, #4159AD 0%, #7A66C8 55%, #AC6ADF 100%);
+  --ss-grad-h:    linear-gradient(90deg, #3956A4 0%, #6E5DBE 50%, #AC6AD9 100%);
+  --ss-grad-icon: linear-gradient(135deg, #C77DFF 0%, #8FA2F5 50%, #5BC0F8 100%);
+
+  /* Neutrals */
+  --ink:   #15161C;
+  --ink-2: #474853;
+  --ink-3: #7A7B86;
+  --ink-4: #A9AAB4;
+  --line:  #ECECF2;
+  --line-2:#E2E3EB;
+  --bg:    #FFFFFF;
+  --bg-app:#F5F6FA;
+  --bg-soft:#F8F8FC;
+
+  /* Site background blobs */
+  --blob-lavender: #F1EEFC;
+  --blob-ice:      #EAF2FB;
+
+  /* Market colors */
+  --up:      #12A16B;
+  --up-2:    #16B877;
+  --up-soft: #E6F7EF;
+  --down:    #E5484D;
+  --down-soft:#FDECEC;
+  --warn:    #E8A317;
+
+  --font-site: 'Open Sans', system-ui, sans-serif;
+  --font-ui:   'Inter', system-ui, sans-serif;
+}

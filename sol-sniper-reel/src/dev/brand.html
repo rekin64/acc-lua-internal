@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>dev: brand</title>
+<link rel="stylesheet" href="../styles/fonts.css"><link rel="stylesheet" href="../styles/tokens.css">
+<style>html,body{margin:0;background:#fff} #root{display:flex;flex-direction:column;gap:60px;align-items:center;justify-content:center;width:1080px;height:1080px}</style>
+</head><body><div id="root"></div>
+<script type="module">
+  import { createLogo, logoMarkSVG } from '../components/brand.js';
+  const root = document.getElementById('root');
+  root.insertAdjacentHTML('beforeend', logoMarkSVG(320));
+  root.appendChild(createLogo({ size: 96, gradient: true }));
+  root.appendChild(createLogo({ size: 22 }));
+  window.__render = () => {};
+  window.__ready = document.fonts.ready;
+</script></body></html>
