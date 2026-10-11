@@ -11,7 +11,7 @@
 //  4.03       punch-in cut
 //  4.03-4.70  the hand rests on the notes (brief slow motion), then lifts the next bundle (punch at 4.53)
 //  4.70-5.00  real speed: the hand swings the next bundle over and pushes it down into the box; the camera
-//             pushes in on the spot where the notes land (motion blur, 360° shutter on the last frames) as the
+//             pushes in on the spot where the notes land (subtle motion blur, 270° shutter on the last frames) as the
 //             shadow of the box closes in: cut on the action, on the beat, as the notes hit the box, into the
 //             reel's dark title frame and its opening impact
 //
@@ -65,7 +65,7 @@ function camera(t) {
     // pushes in on the spot where the notes land (held in place on screen, so it stays a push, not a pan)
     // and drifts down with the hand; the move accelerates into the cut, which lands as the notes hit the box
     const p = prog(t, WHIP, DURATION);
-    S *= lerp(1, 1.42, ease.inCubic(p));
+    S *= lerp(1, 1.3, ease.inCubic(p));
     tx = lx - LAND.x * S;
     ty = ly - LAND.y * S - 120 * Math.pow(p, 3);
   }

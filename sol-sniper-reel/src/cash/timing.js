@@ -65,5 +65,5 @@ export const samplesFor = (frame, base = 4, fastMax = 64) => {
   for (const [a, b, k] of FAST_MOTION) if (t >= a && t < b) n = Math.max(n, Math.min(k, fastMax));
   return n;
 };
-/** 360° shutter on the push-in frames, so each frame's streak reaches the next frame's (no stepping). */
-export const shutterFor = (frame, def = 0.5) => (frame >= 143 ? 1.0 : def);
+/** 270° shutter on the push-in frames: the streaks nearly join up (no stepping) and the blur stays subtle. */
+export const shutterFor = (frame, def = 0.5) => (frame >= 143 ? 0.75 : def);

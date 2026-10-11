@@ -10,11 +10,12 @@ The edit runs the real footage at real speed, with three speed ramps:
                  speed, untouched source frames, and the cut lands as the notes hit the box
 Where the remap lands between two source frames, the in-between frame is synthesized with dense
 optical flow (OpenCV DIS, both directions), like an editor's optical-flow time remap; where the two
-warped neighbours disagree (occlusions), the nearer one is used instead of a double exposure.
+warped neighbours disagree (occlusions), the nearer one is used instead of a double exposure. Inside
+the fast pan (output 52-58) the neighbours are blended instead, with the pan's horizontal motion blur.
 Whole-frame positions use the source frame untouched.
 
 The shoe-box lid carries a third-party logo (it passes behind the "Wait…" type at 1.8-2.5 s). It is
-tracked in the source frames (template match) and blurred into the lid colour before retiming.
+tracked in the source frames (template match) and inpainted from the lid around it before retiming.
 
   python3 scripts/cash_frames.py && python3 scripts/cash_plate.py   # -> out/cash/plate/p_0000.jpg ... p_0149.jpg
 """
@@ -87,21 +88,40 @@ def track_logo():
     return boxes
 
 
-def hide_logo(img, box):
+# source frames where the lid flies off: the print is already motion-smeared, so it only gets a blur along
+# the lid's movement (no flat patch); on the frame before, the patch keeps more of the blurred footage
+LOGO_SMEAR = {76: 0.4, 77: None, 78: None}   # source frame -> lid-colour weight (None: smear only)
+
+
+def hide_logo(img, box, i=None):
     """Blur the logo into the lid: a heavy blur pulled toward the surrounding lid colour, feathered."""
     x, y, w, h = box
     H, W = img.shape[:2]
     m = np.zeros((H, W), np.float32)
     pad = 26
-    cv2.rectangle(m, (x - pad, y - pad), (x + w + pad + 60, y + h + pad), 1.0, -1)  # + the smear's trailing side
+    trail = 0 if i in LOGO_SMEAR else 60  # + the smear's trailing side
+    cv2.rectangle(m, (x - pad, y - pad), (x + w + pad + trail, y + h + pad), 1.0, -1)
     m = cv2.GaussianBlur(m, (0, 0), 18)
     ring = (cv2.GaussianBlur(m, (0, 0), 60) > 0.05) & (m < 0.02)
     f = img.astype(np.float32)
     lum = f.mean(axis=2)
     sel = ring & (lum < 110)
     lid = np.median(f[sel], axis=0) if sel.sum() > 500 else np.median(f[ring], axis=0)
-    soft = cv2.GaussianBlur(f, (0, 0), 28)
-    patch = 0.1 * soft + 0.9 * lid[None, None, :]
+    if i in LOGO_SMEAR:
+        smear = cv2.blur(f, (9, 61))  # along the lid's upward movement
+        wl = LOGO_SMEAR[i] or 0.0
+        patch = (1 - wl) * smear + wl * lid[None, None, :]
+        out = f * (1 - m[..., None]) + patch * m[..., None]
+        return np.clip(np.rint(out), 0, 255).astype(np.uint8)
+    # inpaint the print's bright strokes from the lid around them (keeps the lid's own gradient and
+    # sheen, so no flat patch shows), then soften what is left inside the feathered box
+    box = np.zeros((H, W), np.uint8)
+    cv2.rectangle(box, (x - pad, y - pad), (x + w + pad + trail, y + h + pad), 1, -1)
+    lid_lum = float(np.median(lum[sel])) if sel.sum() > 500 else float(np.median(lum[ring]))
+    strokes = ((lum > lid_lum + 14) & (box > 0)).astype(np.uint8)
+    strokes = cv2.dilate(strokes, np.ones((13, 13), np.uint8))
+    filled = cv2.inpaint(img, strokes * 255, 15, cv2.INPAINT_TELEA).astype(np.float32)
+    patch = cv2.GaussianBlur(filled, (0, 0), 7)
     out = f * (1 - m[..., None]) + patch * m[..., None]
     return np.clip(np.rint(out), 0, 255).astype(np.uint8)
 
@@ -113,7 +133,7 @@ _cache = {}
 def load(i):
     if i not in _cache:
         img = load_raw(i)
-        _cache[i] = hide_logo(img, LOGO[i]) if i in LOGO else img
+        _cache[i] = hide_logo(img, LOGO[i], i) if i in LOGO else img
     return _cache[i]
 
 
@@ -149,6 +169,17 @@ def between(i, t):
     return np.clip(np.rint(255.0 * mix ** (1 / 2.2)), 0, 255).astype(np.uint8)
 
 
+def pan_between(i, t, length=31):
+    """In-between frame inside the fast pan (output 52-58): optical flow breaks up on the motion-smeared notes
+    there, so blend the two neighbours in linear light and give the blend the pan's horizontal motion blur."""
+    lin = lambda x: (x.astype(np.float32) / 255.0) ** 2.2
+    mix = (1 - t) * lin(load(i)) + t * lin(load(i + 1))
+    out = np.clip(np.rint(255.0 * mix ** (1 / 2.2)), 0, 255).astype(np.uint8)
+    return cv2.blur(out, (length, 1))
+
+
+PAN_BLEND = range(52, 59)
+
 os.makedirs(OUT, exist_ok=True)
 n_src = len([f for f in os.listdir(SRC) if f.endswith('.jpg')])
 plan = []
@@ -159,7 +190,7 @@ for k in range(FRAMES):
         i, t = min(int(round(s)), n_src - 1), 0.0
         img = load(i)
     else:
-        img = between(i, t)
+        img = pan_between(i, t) if k in PAN_BLEND else between(i, t)
     Image.fromarray(img).save(os.path.join(OUT, f'p_{k:04d}.jpg'), quality=97, subsampling=0)
     plan.append({'k': k, 'source': round(s, 3), 'synth': t > 0})
 # The source has one unusually sharp frame inside the fast pan (source 56, between motion-blurred neighbours);
