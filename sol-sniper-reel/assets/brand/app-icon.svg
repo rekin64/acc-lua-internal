@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="app-icon-t">
+  <title id="app-icon-t">SOL Sniper app icon</title>
+  <defs><linearGradient id="app-icon-ss-tile" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3956A4"/><stop offset="0.52" stop-color="#6E5DBE"/><stop offset="1" stop-color="#AC6AD9"/></linearGradient></defs>
+  <rect width="1024" height="1024" fill="url(#app-icon-ss-tile)"/>
+  <path d="M761.177 330.962A308 308 0 0 0 206.775 553.25H413V470.75H295.902A220 220 0 0 1 689.984 382.687ZM262.823 693.038A308 308 0 0 0 817.225 470.75H611V553.25H728.098A220 220 0 0 1 334.016 641.313Z" fill="#FFFFFF"/><circle cx="512" cy="512" r="49.5" fill="#FFFFFF"/>
+</svg>

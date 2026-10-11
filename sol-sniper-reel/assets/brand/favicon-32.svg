@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-labelledby="favicon-32-t">
+  <title id="favicon-32-t">SOL Sniper</title>
+  <defs><linearGradient id="favicon-32-ss-f" x1="0" y1="2" x2="0" y2="30" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3956A4"/><stop offset="1" stop-color="#6E5DBE"/></linearGradient></defs>
+  <path d="M27.2 7.6A14 14 0 0 0 2.144 18H12V14H6.202A10 10 0 0 1 24 10ZM4.8 24.4A14 14 0 0 0 29.856 14H20V18H25.798A10 10 0 0 1 8 22ZM14 16A2 2 0 1 0 18 16A2 2 0 1 0 14 16Z" fill="url(#favicon-32-ss-f)"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 4 56 56" role="img" aria-labelledby="logo-mark-t">
+  <title id="logo-mark-t">SOL Sniper</title>
+  <desc>An S drawn from a ring split into two hooks whose horizontal stubs lock onto a centre coin.</desc>
+  <defs><linearGradient id="logo-mark-ss-m" x1="0" y1="4" x2="0" y2="62" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3956A4"/><stop offset="0.52" stop-color="#6E5DBE"/><stop offset="1" stop-color="#AC6AD9"/></linearGradient></defs>
+  <path d="M54.652 15.542A28 28 0 0 0 4.252 35.75H23V28.25H12.355A20 20 0 0 1 48.18 20.244ZM9.348 48.458A28 28 0 0 0 59.748 28.25H41V35.75H51.645A20 20 0 0 1 15.82 43.756Z" fill="url(#logo-mark-ss-m)"/><circle cx="32" cy="32" r="4.5" fill="url(#logo-mark-ss-m)"/>
+</svg>

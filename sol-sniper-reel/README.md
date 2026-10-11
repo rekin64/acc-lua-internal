@@ -71,6 +71,17 @@ node scripts/render.mjs --page src/cash/index.html --timing src/cash/timing.js -
 python3 scripts/encode.py --frames out/cash_frames,out/frames --audio audio/cash_intro/soundtrack_with_intro.wav --out dist/sol-sniper-reel-cash-intro.mp4
 ```
 
+## Logo
+
+The SOL Sniper logo kit is in `assets/brand/`; `assets/brand/README.md` covers the idea, construction, colours, clear space and minimum sizes. It includes:
+- **Mark:** colour, dark-ground, one-colour and white versions.
+- **Lockups:** horizontal and stacked.
+- **App icons:** iOS and Android.
+- **Favicons:** hinted 16 and 32 px masters.
+- **PNG exports** (including the OG image).
+
+The reel above still uses the earlier redrawn icon (`src/components/brand.js`).
+
 ## How it's built
 
 ```

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" role="img" aria-labelledby="app-icon-android-background-t">
+  <title id="app-icon-android-background-t">SOL Sniper adaptive icon background</title>
+  <defs><linearGradient id="app-icon-android-background-ss-tile" x1="0" y1="0" x2="108" y2="108" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3956A4"/><stop offset="0.52" stop-color="#6E5DBE"/><stop offset="1" stop-color="#AC6AD9"/></linearGradient></defs>
+  <rect width="108" height="108" fill="url(#app-icon-android-background-ss-tile)"/>
+</svg>
