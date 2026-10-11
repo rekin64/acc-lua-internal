@@ -1,0 +1,13 @@
+/* Bundled webfonts (SIL OFL 1.1, see assets/fonts/LICENSE-*.txt).
+   Latin subset only: use inline SVG for icons/arrows/checkmarks, not unicode symbols. */
+@font-face { font-family: 'Open Sans'; font-weight: 300; font-style: normal; font-display: block; src: url('../../assets/fonts/open-sans-latin-300-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Open Sans'; font-weight: 400; font-style: normal; font-display: block; src: url('../../assets/fonts/open-sans-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Open Sans'; font-weight: 500; font-style: normal; font-display: block; src: url('../../assets/fonts/open-sans-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Open Sans'; font-weight: 600; font-style: normal; font-display: block; src: url('../../assets/fonts/open-sans-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Open Sans'; font-weight: 700; font-style: normal; font-display: block; src: url('../../assets/fonts/open-sans-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Open Sans'; font-weight: 800; font-style: normal; font-display: block; src: url('../../assets/fonts/open-sans-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: block; src: url('../../assets/fonts/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: block; src: url('../../assets/fonts/inter-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: block; src: url('../../assets/fonts/inter-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: block; src: url('../../assets/fonts/inter-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 800; font-style: normal; font-display: block; src: url('../../assets/fonts/inter-latin-800-normal.woff2') format('woff2'); }

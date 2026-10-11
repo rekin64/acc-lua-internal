@@ -1,0 +1,93 @@
+{
+  "fps": 30,
+  "duration": 5,
+  "bpm": 125,
+  "sections": {
+    "black": {
+      "start": 0,
+      "end": 0.4
+    },
+    "text": {
+      "start": 0.4,
+      "end": 1.3
+    },
+    "phone": {
+      "start": 1.3,
+      "end": 2.8
+    },
+    "build": {
+      "start": 2.8,
+      "end": 4.2
+    },
+    "handoff": {
+      "start": 4.2,
+      "end": 5
+    }
+  },
+  "cues": [
+    {
+      "t": 0,
+      "type": "bass_hit"
+    },
+    {
+      "t": 0,
+      "type": "tension",
+      "dur": 5
+    },
+    {
+      "t": 0.4,
+      "type": "accent",
+      "gain": 0
+    },
+    {
+      "t": 0.8,
+      "type": "accent",
+      "gain": -3
+    },
+    {
+      "t": 1.3,
+      "type": "whoosh",
+      "dur": 0.5
+    },
+    {
+      "t": 2.6,
+      "type": "pulse",
+      "gain": -6
+    },
+    {
+      "t": 2.8,
+      "type": "accent",
+      "gain": -6
+    },
+    {
+      "t": 3.066666666666667,
+      "type": "pulse",
+      "gain": -5
+    },
+    {
+      "t": 3.566666666666667,
+      "type": "pulse",
+      "gain": -4
+    },
+    {
+      "t": 4.033333333333333,
+      "type": "pulse",
+      "gain": -3
+    },
+    {
+      "t": 4.533333333333333,
+      "type": "pulse",
+      "gain": -2
+    },
+    {
+      "t": 5,
+      "type": "riser",
+      "dur": 1.6
+    },
+    {
+      "t": 5,
+      "type": "suck",
+      "dur": 0.8
+    }
+  ]
+}

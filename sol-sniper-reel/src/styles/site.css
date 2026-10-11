@@ -1,0 +1,99 @@
+/* SOL Sniper landing-page hero (vector rebuild of assets/source/site-cropped.png).
+   1920x1080 site coordinates; all geometry measured from the capture. No transitions/animations:
+   every state is driven from site.update(). */
+
+.site {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #FFFFFF;
+  font-family: 'Open Sans', system-ui, sans-serif; color: #555555;
+  -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+  font-kerning: normal; font-synthesis: none;
+}
+.site *, .site *::before, .site *::after { box-sizing: border-box; }
+
+.site-bg { width: 100%; height: 100%; background: #FFFFFF; }
+.site > .site-bg { position: absolute; inset: 0; }
+
+/* faint shade along the bottom edge: the shadow of the next section peeking above the fold */
+.site-fold {
+  position: absolute; left: 64px; right: 64px; top: 1082px; height: 240px; border-radius: 28px;
+  background: #FFFFFF; box-shadow: 0 0 40px rgba(30, 32, 48, 0.11);
+}
+
+/* ---------------- nav ---------------- */
+.site-nav {
+  position: absolute; left: 480px; top: 10px; width: 960px; height: 54px; border-radius: 10px;
+  background: #FFFFFF;
+}
+/* the nav's drop shadow, drawn analytically by site.js (seamless at any zoom; see navShadowStyle) */
+.site-nav-sh { position: absolute; pointer-events: none; }
+/* brand lockup (createLogo, size 17.5) anchored by the wordmark's right edge: word ink at x 543.5-634.6 */
+.site-logo { position: absolute; right: 805.42px; top: 19.25px; }
+.site-mark { display: block; }
+.site-mark > svg { display: block; }
+.site-logo .ss-word { letter-spacing: 0.01em; }
+.site-link {
+  position: absolute; top: 0; height: 100%; width: 200px; left: calc(var(--cx) - 480px - 100px);
+  display: flex; align-items: center; justify-content: center;
+}
+.site-link > span {
+  display: block; font-weight: 400; font-size: 13px; line-height: 18px; color: #222222; /* neutral, as captured */
+  letter-spacing: 0; white-space: nowrap;
+}
+.site-link > .site-badge {
+  display: block; height: 20px; padding: 0 9px; border-radius: 999px;
+  background: var(--ss-badge-bg, #F0EEFB); color: var(--ss-badge-ink, #7D72C9);
+  font-weight: 600; font-size: 9px; line-height: 20px; letter-spacing: 0.01em;
+}
+
+/* ---------------- headline ---------------- */
+.site-h1 {
+  position: absolute; left: 0; right: 0; width: max-content; top: 403px; margin: 0 auto; padding: 0 0 32px;
+  font-weight: 700; font-size: 80px; line-height: 80px; letter-spacing: -0.045em; text-align: center;
+  color: transparent;
+  /* brand stops (tokens) placed where the capture has them, plus the measured ramp continued to the
+     top of "AI" and the bottom of the "g" (the capture's gradient overshoots the token range slightly) */
+  background: linear-gradient(180deg, #3252A7 17px, var(--ss-blue, #3956A4) 29.5px, var(--ss-violet, #6E5DBE) 124.3px,
+    var(--ss-lilac, #AC6AD9) 235.3px, #B268E1 246px);
+  -webkit-background-clip: text; background-clip: text;
+}
+.site-h1-l { display: block; width: max-content; margin: 0 auto; white-space: nowrap; }
+
+/* ---------------- subtitle ---------------- */
+.site-sub {
+  position: absolute; left: 0; right: 0; width: max-content; top: 680px; margin: 0 auto;
+  font-weight: 400; font-size: 18px; line-height: 22px; color: #555555; text-align: center; /* neutral grey, as captured */
+}
+.site-sub-l { display: block; width: max-content; margin: 0 auto; white-space: nowrap; }
+
+/* ---------------- CTA ---------------- */
+.site-cta { position: absolute; left: 897px; top: 762px; width: 126px; height: 42px; }
+.site-cta-btn {
+  position: absolute; inset: 0; border-radius: 999px; overflow: hidden;
+  /* --ss-grad-btn stops at the positions measured in the capture, ramp continued to the edges */
+  background: linear-gradient(180deg, #2B4FA1 0%, #4159AD 15%, #7A66C8 55%, #AC6ADF 97%, #B06BE0 100%);
+  display: flex; align-items: center; justify-content: center;
+  transform-origin: 50% 50%;
+}
+.site-cta-hi, .site-cta-tint { position: absolute; inset: 0; border-radius: inherit; opacity: 0; }
+.site-cta-hi { background: linear-gradient(180deg, #375EB6 0%, #8373CF 50%, #BD7EE8 100%); }
+.site-cta-tint { background: rgba(22, 16, 64, 0.11); }
+.site-cta-label {
+  position: relative; font-weight: 500; font-size: 15.5px; line-height: 20px; color: #FFFFFF;
+  letter-spacing: 0; white-space: nowrap;
+}
+
+/* ---------------- dot navigation ---------------- */
+.site-dots {
+  position: absolute; left: 1814px; top: 433px; width: 45px; height: 215px; border-radius: 999px;
+  background: #FFFFFF;
+  box-shadow: 0 20px 50px -2px rgba(40, 60, 90, 0.10);
+}
+.site-dot {
+  position: absolute; left: 19.75px; width: 6.5px; height: 6.5px; border-radius: 50%; background: #0B0B0F;
+}
+/* dot centres at y = 462 + 39k (site) */
+.site-dot:nth-child(1) { top: 25.75px; }
+.site-dot:nth-child(2) { top: 64.75px; }
+.site-dot:nth-child(3) { top: 103.75px; }
+.site-dot:nth-child(4) { top: 142.75px; }
+.site-dot:nth-child(5) { top: 181.75px; }

@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>dev: site</title>
+<link rel="stylesheet" href="../styles/fonts.css"><link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/site.css">
+<style>html,body{margin:0;background:#000;overflow:hidden;width:100vw;height:100vh} #root{position:relative;width:1920px;height:1080px}</style>
+</head><body><div id="root"></div>
+<script type="module">
+  // Dev harness for the site component. Snap at 1920x1080:
+  //   node scripts/snap.mjs src/dev/site.html --w 1920 --h 1080 --times 0,1,2
+  // t=0 rest, t=1 CTA hover, t=2 CTA pressed.
+  import { createSite } from '../components/site.js';
+  const site = createSite();
+  document.getElementById('root').appendChild(site.el);
+  window.__render = (t) => site.update({ t, ctaHover: t >= 1 ? 1 : 0, ctaPress: t >= 2 ? 1 : 0 });
+  // Optional camera preview: ?view=cx,cy,zoom renders a crop centred on (cx,cy) at `zoom`,
+  // exactly as the reel camera sees it. Snap with --w 1080 --h 1920.
+  const view = new URLSearchParams(location.search).get('view');
+  if (view) {
+    const [cx, cy, z] = view.split(',').map(Number);
+    const root = document.getElementById('root');
+    root.style.transformOrigin = '0 0';
+    root.style.transform = `translate(${540 - cx * z}px, ${960 - cy * z}px) scale(${z})`;
+  }
+  window.__ready = document.fonts.ready.then(() => window.__render(0));
+</script></body></html>

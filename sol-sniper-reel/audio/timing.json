@@ -1,0 +1,340 @@
+{
+  "fps": 30,
+  "duration": 15,
+  "bpm": 125,
+  "beat": 0.48,
+  "sections": {
+    "title": {
+      "start": 0,
+      "end": 1.44
+    },
+    "reveal": {
+      "start": 1.44,
+      "end": 3.84
+    },
+    "demo": {
+      "start": 3.84,
+      "end": 6.24
+    },
+    "drop": {
+      "start": 6.24,
+      "end": 9.6
+    },
+    "montage": {
+      "start": 9.6,
+      "end": 12.48
+    },
+    "outro": {
+      "start": 12.48,
+      "end": 15
+    }
+  },
+  "music": {
+    "bpm": 125,
+    "key": "F minor",
+    "markers": [
+      {
+        "t": 0,
+        "name": "intro",
+        "note": "Impact + dark pad swell, no drums. Reverse swell into 1.44."
+      },
+      {
+        "t": 1.44,
+        "name": "groove_a",
+        "note": "Kick on quarters (low-passed), sub pulses, filtered 16th pluck arp, soft offbeat hats. Chord: Fm9."
+      },
+      {
+        "t": 3.84,
+        "name": "groove_b",
+        "note": "Add light clap on 2 & 4, 8th hats, arp filter opens. Chord: Dbmaj7."
+      },
+      {
+        "t": 5.28,
+        "name": "build",
+        "note": "Snare roll 8ths -> 16ths, riser, filter sweep up. Chord: Eb. Kick drops out at 6.00 (pre-drop gap)."
+      },
+      {
+        "t": 6,
+        "name": "gap",
+        "note": "Pre-drop gap: only riser tail / reverse swell."
+      },
+      {
+        "t": 6.24,
+        "name": "drop",
+        "note": "Full groove: kick 4/4, clap 2 & 4, open hats offbeat, sidechained rolling bass, chord stabs. Fm9 (3 beats) -> Dbmaj7 (2) -> Eb (2)."
+      },
+      {
+        "t": 9.6,
+        "name": "montage",
+        "note": "Drop continues + 16th hats + extra perc, accents on cut hits. Fm9 -> Db -> Eb -> Cm7, one chord per beat pair."
+      },
+      {
+        "t": 12,
+        "name": "break",
+        "note": "Everything cuts except short riser / reverse swell into the outro."
+      },
+      {
+        "t": 12.48,
+        "name": "outro",
+        "note": "Final impact, wide warm sustained chord (Dbmaj9 -> Abmaj9 / resolve bright), no drums. Tail rings out, clean fade to silence at 15.00."
+      }
+    ]
+  },
+  "cues": [
+    {
+      "t": 0,
+      "type": "impact_big"
+    },
+    {
+      "t": 0,
+      "type": "text_reveal",
+      "gain": -4
+    },
+    {
+      "t": 0.9666666666666667,
+      "type": "tick",
+      "gain": -6
+    },
+    {
+      "t": 1.2,
+      "type": "whoosh_fast",
+      "gain": -5
+    },
+    {
+      "t": 1.4333333333333333,
+      "type": "whoosh_rise"
+    },
+    {
+      "t": 1.4333333333333333,
+      "type": "hit_cut",
+      "gain": -6
+    },
+    {
+      "t": 1.8,
+      "type": "whoosh_long",
+      "dur": 0.6
+    },
+    {
+      "t": 1.9333333333333333,
+      "type": "text_reveal",
+      "gain": -8
+    },
+    {
+      "t": 2.7666666666666666,
+      "type": "whoosh_long",
+      "dur": 0.48,
+      "pan": 0.2
+    },
+    {
+      "t": 3.6333333333333333,
+      "type": "tap_soft",
+      "gain": -6
+    },
+    {
+      "t": 3.8333333333333335,
+      "type": "click"
+    },
+    {
+      "t": 3.8333333333333335,
+      "type": "zoom_through",
+      "dur": 0.1667
+    },
+    {
+      "t": 4.333333333333333,
+      "type": "ui_blip"
+    },
+    {
+      "t": 4.433333333333334,
+      "type": "whoosh_fast",
+      "gain": -12,
+      "pan": 0.2
+    },
+    {
+      "t": 4.8,
+      "type": "click"
+    },
+    {
+      "t": 5.1,
+      "type": "success",
+      "gain": -3
+    },
+    {
+      "t": 5.266666666666667,
+      "type": "toast"
+    },
+    {
+      "t": 6.233333333333333,
+      "type": "riser",
+      "dur": 0.96
+    },
+    {
+      "t": 6.233333333333333,
+      "type": "reverse_swell",
+      "dur": 0.6
+    },
+    {
+      "t": 6.233333333333333,
+      "type": "whip",
+      "dur": 0.1333,
+      "pan": 0.3
+    },
+    {
+      "t": 6.233333333333333,
+      "type": "impact_drop"
+    },
+    {
+      "t": 6.733333333333333,
+      "type": "hit_cut",
+      "gain": -5
+    },
+    {
+      "t": 6.733333333333333,
+      "type": "whoosh_fast",
+      "pan": -0.3,
+      "gain": -8
+    },
+    {
+      "t": 6.966666666666667,
+      "type": "click",
+      "gain": -3
+    },
+    {
+      "t": 7.2,
+      "type": "click"
+    },
+    {
+      "t": 7.433333333333334,
+      "type": "success"
+    },
+    {
+      "t": 7.5,
+      "type": "toast",
+      "gain": -3
+    },
+    {
+      "t": 7.666666666666667,
+      "type": "whoosh_long",
+      "dur": 0.3,
+      "pan": 0.2
+    },
+    {
+      "t": 8.166666666666666,
+      "type": "tick",
+      "gain": -4
+    },
+    {
+      "t": 8.633333333333333,
+      "type": "success",
+      "gain": -4
+    },
+    {
+      "t": 8.633333333333333,
+      "type": "punch",
+      "gain": -6
+    },
+    {
+      "t": 9.133333333333333,
+      "type": "whoosh_long",
+      "dur": 0.46,
+      "gain": -2
+    },
+    {
+      "t": 9.6,
+      "type": "hit_cut"
+    },
+    {
+      "t": 9.6,
+      "type": "whoosh_fast",
+      "gain": -4
+    },
+    {
+      "t": 10.066666666666666,
+      "type": "hit_cut",
+      "gain": -2
+    },
+    {
+      "t": 10.2,
+      "type": "click",
+      "gain": -4
+    },
+    {
+      "t": 10.566666666666666,
+      "type": "hit_cut",
+      "gain": -2
+    },
+    {
+      "t": 10.566666666666666,
+      "type": "whoosh_fast",
+      "gain": -6,
+      "pan": -0.4
+    },
+    {
+      "t": 11.033333333333333,
+      "type": "hit_cut",
+      "gain": -2
+    },
+    {
+      "t": 11.033333333333333,
+      "type": "tick",
+      "gain": -6
+    },
+    {
+      "t": 11.266666666666667,
+      "type": "hit_cut",
+      "gain": -4
+    },
+    {
+      "t": 11.533333333333333,
+      "type": "hit_cut",
+      "gain": -2
+    },
+    {
+      "t": 11.533333333333333,
+      "type": "success",
+      "gain": -8
+    },
+    {
+      "t": 11.766666666666667,
+      "type": "hit_cut",
+      "gain": -4
+    },
+    {
+      "t": 12,
+      "type": "hit_cut",
+      "gain": -1
+    },
+    {
+      "t": 12.466666666666667,
+      "type": "riser",
+      "dur": 0.48
+    },
+    {
+      "t": 12.466666666666667,
+      "type": "reverse_swell",
+      "dur": 0.48
+    },
+    {
+      "t": 12.466666666666667,
+      "type": "impact_outro"
+    },
+    {
+      "t": 13.066666666666666,
+      "type": "text_reveal",
+      "gain": -8
+    },
+    {
+      "t": 13.566666666666666,
+      "type": "whoosh_rise",
+      "gain": -8
+    },
+    {
+      "t": 14.2,
+      "type": "tap_soft",
+      "gain": -6
+    },
+    {
+      "t": 14.4,
+      "type": "click_final"
+    }
+  ]
+}
