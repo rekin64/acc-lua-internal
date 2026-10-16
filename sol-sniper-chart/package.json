@@ -1,0 +1,9 @@
+{
+  "name": "sol-sniper-chart",
+  "private": true,
+  "type": "module",
+  "description": "SOL Sniper candlestick chart video (synthetic data)",
+  "scripts": {
+    "still": "node scripts/render-still.js"
+  }
+}
