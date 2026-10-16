@@ -145,6 +145,7 @@ export function drawFrame(ctx, t, market, assets, position = null) {
   for (const [v, y] of levels) ctx.fillText(v.toFixed(6), AXIS_X, y);
 
   // ---- volume ------------------------------------------------------------
+  const volRects = [];
   s.candles.forEach((k, i) => {
     const h = Math.max(3, vOf(k.v));
     const x = slotX(i) - VOL_W / 2;
@@ -157,9 +158,24 @@ export function drawFrame(ctx, t, market, assets, position = null) {
     roundRect(ctx, x, VOL_BOT - h, VOL_W, h, 2);
     ctx.fill();
     ctx.globalAlpha = 1;
+    volRects.push({ x, y: VOL_BOT - h, w: VOL_W, h });
   });
 
-  if (pos?.open) drawEntryLine(ctx, position, yOf);
+  if (pos?.open) {
+    // keep the entry line off every candle (body, 3 px minimum, wicks) and volume bar
+    const candleRects = s.candles.map((k, i) => {
+      let top = Math.min(yOf(k.o), yOf(k.c));
+      let bh = Math.abs(yOf(k.c) - yOf(k.o));
+      if (bh < 3) {
+        top -= (3 - bh) / 2;
+        bh = 3;
+      }
+      const y0 = Math.min(yOf(k.h), top) - 2;
+      const y1 = Math.max(yOf(k.l), top + bh) + 2;
+      return { x: Math.round(slotX(i) - BODY_W / 2) - 1, y: y0, w: BODY_W + 2, h: y1 - y0 };
+    });
+    drawEntryLine(ctx, position, yOf, [...volRects, ...candleRects]);
+  }
 
   // ---- candles -----------------------------------------------------------
   s.candles.forEach((k, i) => {

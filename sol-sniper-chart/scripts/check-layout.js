@@ -1,5 +1,6 @@
-// Checks, frame by frame, that the PNL panel and the ENTRY tag never cover a
-// candle (wick and glow included), a volume bar or another UI element.
+// Checks, frame by frame, that the PNL panel, the ENTRY tag and the entry dot
+// never cover a candle (wick and glow included), a volume bar or another UI
+// element, and that the tag stays inside the plot.
 // Usage: node scripts/check-layout.js   (exit code 1 on any overlap)
 
 import { createServer } from 'node:http';
@@ -39,12 +40,14 @@ const report = await page.evaluate(async () => {
   const { buildPosition } = await import('/src/position.js');
   const { loadTnumFonts } = await import('/src/fonts.js');
   const ui = await import('/src/ui.js');
-  const { PNL_BOX, entryTagBox, entryPoint } = await import('/src/overlay.js');
+  const { PNL_BOX, entryTagBox, entryPoint, entryDotBox } = await import('/src/overlay.js');
   await loadTnumFonts((f) => `/public/fonts/${f}`);
   const ctx = document.createElement('canvas').getContext('2d');
   const market = buildMarket();
   const position = buildPosition(market);
-  const GLOW = 6; // candle glow margin, px
+  // visible glow margin: shadowBlur 18 (up) / 10 (down) in render.js
+  const GLOW_UP = 12;
+  const GLOW_DOWN = 8;
   const gapOf = (a, b) => {
     const dx = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), 0);
     const dy = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h), 0);
@@ -55,7 +58,8 @@ const report = await page.evaluate(async () => {
     { name: 'price axis', x: ui.SEP_X, y: ui.PRICE_TOP - 24, w: 1920 - ui.SEP_X, h: ui.VOL_BOT - ui.PRICE_TOP + 24 },
     { name: 'header', x: 0, y: 0, w: 1920, h: 160 },
   ];
-  const worst = { panel: { gap: Infinity }, tag: { gap: Infinity } };
+  const worst = { panel: { gap: Infinity }, tag: { gap: Infinity }, dot: { gap: Infinity } };
+  if (PNL_BOX.y - (ui.PILL_Y + ui.PILL_H) <= 0) overlaps.push({ frame: -1, box: 'panel', with: 'pills' });
   const overlaps = [];
   let tagChecked = 0;
   for (let f = 0; f < FPS * DURATION; f++) {
@@ -63,17 +67,40 @@ const report = await page.evaluate(async () => {
     const s = market.stateAt(t);
     const yOf = (p) => ui.PRICE_BOT - ((p - s.yMin) / (s.yMax - s.yMin)) * (ui.PRICE_BOT - ui.PRICE_TOP);
     const things = [...fixed];
+    const bodies = [];
     s.candles.forEach((k, i) => {
       const cx = ui.slotX(i);
-      const top = yOf(k.h);
-      things.push({ name: `candle ${i}`, x: cx - ui.BODY_W / 2 - GLOW, y: top - GLOW, w: ui.BODY_W + 2 * GLOW, h: Math.max(3, yOf(k.l) - top) + 2 * GLOW });
+      const glow = k.c >= k.o ? GLOW_UP : GLOW_DOWN;
+      // body exactly as render.js draws it (3 px minimum, centred on open/close)
+      let bTop = Math.min(yOf(k.o), yOf(k.c));
+      let bh = Math.abs(yOf(k.c) - yOf(k.o));
+      if (bh < 3) {
+        bTop -= (3 - bh) / 2;
+        bh = 3;
+      }
+      const top = Math.min(yOf(k.h), bTop);
+      const bottom = Math.max(yOf(k.l), bTop + bh);
+      const bx = Math.round(cx - ui.BODY_W / 2);
+      bodies.push({ name: `candle ${i} (no glow)`, x: bx, y: top, w: ui.BODY_W, h: bottom - top });
+      things.push({ name: `candle ${i}`, x: bx - glow, y: top - glow, w: ui.BODY_W + 2 * glow, h: bottom - top + 2 * glow });
       const vh = Math.max(3, (k.v / s.vMax) * ui.VOL_H);
       things.push({ name: `volume ${i}`, x: cx - ui.VOL_W / 2, y: ui.VOL_BOT - vh, w: ui.VOL_W, h: vh });
     });
     const boxes = [['panel', PNL_BOX]];
     if (position.at(t).open) {
-      boxes.push(['tag', entryTagBox(ctx, position, yOf)]);
+      const tag = entryTagBox(ctx, position, yOf);
+      boxes.push(['tag', tag]);
       tagChecked++;
+      if (tag.x < ui.X0 || tag.x + tag.w > ui.SEP_X || tag.y < ui.PRICE_TOP - 24 || tag.y + tag.h > ui.VOL_BOT) {
+        overlaps.push({ frame: f, box: 'tag', with: 'plot bounds' });
+      }
+      // the dot must not touch any candle body/wick (glow allowed) nor a volume bar
+      const dot = entryDotBox(position, yOf);
+      for (const th of [...bodies, ...things.filter((x) => x.name.startsWith('volume'))]) {
+        const g = gapOf(dot, th);
+        if (g < 0) overlaps.push({ frame: f, box: 'dot', with: th.name });
+        if (g < worst.dot.gap) worst.dot = { gap: Math.round(g * 10) / 10, frame: f, with: th.name };
+      }
     }
     for (const [name, box] of boxes) {
       for (const th of things) {

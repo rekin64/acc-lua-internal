@@ -3,12 +3,12 @@
 // shown, and the panel is labelled "Simulated position".
 
 import { centsToString, formatPctBp, formatUsdCents } from './format.js';
-import { SEP_X, THEME, roundRect, slotX } from './ui.js';
+import { PITCH, SEP_X, THEME, roundRect, slotX } from './ui.js';
 
 const TNUM = '"Inter Tnum", Inter, system-ui, sans-serif';
 
 const C = {
-  bg: 'rgba(8, 15, 36, 0.80)',
+  bg: 'rgba(8, 15, 36, 0.72)',
   shadow: 'rgba(0, 0, 0, 0.45)',
   borderA: 'rgba(59, 102, 240, 0.55)', // blue
   borderB: 'rgba(135, 119, 224, 0.55)', // violet
@@ -16,7 +16,7 @@ const C = {
   label: '#8A97BF',
   value: '#F4F5F8',
   muted: '#56638B',
-  brand: '#7D95FF', // SOL Sniper wordmark blue, lifted for dark backgrounds
+  brand: '#5B7BFB', // SOL Sniper wordmark blue (solsniper.com)
   violet: '#8777E0',
   violetText: '#C9C2FF',
   blueText: '#AFC0FF',
@@ -29,16 +29,18 @@ const C = {
   tagBorder: 'rgba(135, 119, 224, 0.60)',
 };
 
+const DOT_R = 4;
+
 // ---- panel geometry -----------------------------------------------------
 const PAD = 24;
-const HEAD_H = 66;
-const ROW_H = 42;
-const PNL_ROW_H = 52;
-const GAP = 10; // breathing room around the separators
-const FOOT_H = 50;
+const HEAD_H = 60;
+const ROW_H = 38;
+const PNL_ROW_H = 48;
+const GAP = 8; // breathing room around the separators
+const FOOT_H = 44;
 const X = 52;
 const Y = 268;
-const W_ = 504;
+const W_ = 500;
 const H_ = HEAD_H + 4 * ROW_H + 2 * GAP + ROW_H + PNL_ROW_H + ROW_H + GAP + FOOT_H;
 export const PNL_BOX = { x: X, y: Y, w: W_, h: H_, r: 18 };
 
@@ -48,6 +50,8 @@ function separator(ctx, y) {
   ctx.fillStyle = C.sep;
   ctx.fillRect(X + PAD, Math.round(y), W_ - 2 * PAD, 1);
 }
+
+const DASH = '—';
 
 function row(ctx, top, h, label, value, { valueFont = `600 22px ${TNUM}`, color = C.value, dot = null } = {}) {
   const cy = top + h / 2;
@@ -64,8 +68,9 @@ function row(ctx, top, h, label, value, { valueFont = `600 22px ${TNUM}`, color 
   ctx.fillStyle = C.label;
   ctx.textAlign = 'left';
   ctx.fillText(label, lx, cy + 1);
-  ctx.font = valueFont;
-  ctx.fillStyle = color;
+  // empty values all use the same muted dash
+  ctx.font = value === DASH ? `600 22px ${TNUM}` : valueFont;
+  ctx.fillStyle = value === DASH ? C.muted : color;
   ctx.textAlign = 'right';
   ctx.fillText(value, X + W_ - PAD, cy + 1);
 }
@@ -93,10 +98,10 @@ export function drawPositionPanel(ctx, position, pos, assets) {
 
   // soft drop shadow, outside the panel only (the panel itself is see-through)
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  roundRect(ctx, X, Y, W_, H_, PNL_BOX.r);
-  ctx.clip('evenodd');
+  const outside = new Path2D();
+  outside.rect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  outside.roundRect(X, Y, W_, H_, PNL_BOX.r);
+  ctx.clip(outside, 'evenodd');
   ctx.shadowColor = C.shadow;
   ctx.shadowBlur = 28;
   ctx.shadowOffsetY = 10;
@@ -138,13 +143,13 @@ export function drawPositionPanel(ctx, position, pos, assets) {
   separator(ctx, Y + HEAD_H);
 
   // position details
-  const dash = '—';
+  const dash = DASH;
   let y = Y + HEAD_H;
-  row(ctx, y, ROW_H, 'Position Size', formatUsdCents(position.sizeCents));
+  row(ctx, y, ROW_H, 'Position Size', pos.open ? formatUsdCents(position.sizeCents) : dash);
   y += ROW_H;
-  row(ctx, y, ROW_H, 'Entry Price', pos.open ? position.entry.text : dash, { dot: C.violet, color: pos.open ? C.value : C.muted });
+  row(ctx, y, ROW_H, 'Entry Price', pos.open ? position.entry.text : dash, { dot: pos.open ? C.violet : C.muted });
   y += ROW_H;
-  row(ctx, y, ROW_H, 'Tokens', pos.open ? centsToString(position.tokensHundredths) : dash, { color: pos.open ? C.value : C.muted });
+  row(ctx, y, ROW_H, 'Tokens', pos.open ? centsToString(position.tokensHundredths) : dash);
   y += ROW_H;
   row(ctx, y, ROW_H, 'Current Price', pos.price.text);
   y += ROW_H + GAP;
@@ -152,7 +157,7 @@ export function drawPositionPanel(ctx, position, pos, assets) {
   y += GAP;
 
   // marked-to-market values
-  row(ctx, y, ROW_H, 'Current Value', pos.open ? formatUsdCents(pos.valueCents) : dash, { color: pos.open ? C.value : C.muted });
+  row(ctx, y, ROW_H, 'Current Value', pos.open ? formatUsdCents(pos.valueCents) : dash);
   y += ROW_H;
   row(ctx, y, PNL_ROW_H, 'Unrealized PNL', pos.open ? formatUsdCents(pos.pnlCents, { signed: true }) : dash, {
     valueFont: `700 30px ${TNUM}`,
@@ -179,8 +184,15 @@ export function drawPositionPanel(ctx, position, pos, assets) {
 const TAG_TEXT = 'ENTRY — $500';
 const TAG_H = 26;
 
+// The dot sits in the gap just left of the entry candle, so the candle itself
+// stays fully visible; the dashed line runs from it through the entry candle.
 export function entryPoint(position, yOf) {
-  return { x: slotX(position.entrySlot), y: yOf(position.entryValue) };
+  return { x: slotX(position.entrySlot) - PITCH / 2, y: yOf(position.entryValue) };
+}
+
+export function entryDotBox(position, yOf) {
+  const p = entryPoint(position, yOf);
+  return { x: p.x - DOT_R, y: p.y - DOT_R, w: 2 * DOT_R, h: 2 * DOT_R };
 }
 
 export function entryTagBox(ctx, position, yOf) {
@@ -190,14 +202,19 @@ export function entryTagBox(ctx, position, yOf) {
   ctx.letterSpacing = '1px';
   const w = ctx.measureText(TAG_TEXT).width + 22;
   ctx.restore();
-  return { x: p.x - 24 - w, y: p.y - 12 - TAG_H, w, h: TAG_H };
+  return { x: p.x - 10 - w, y: p.y - 16 - TAG_H, w, h: TAG_H };
 }
 
-// Dashed line at the entry price, behind the candles.
-export function drawEntryLine(ctx, position, yOf) {
+// Dashed line at the entry price. `exclude` holds the frame's candle and
+// volume bar rectangles, so the line never touches the chart's own marks.
+export function drawEntryLine(ctx, position, yOf, exclude = []) {
   const p = entryPoint(position, yOf);
-  const y = Math.round(p.y) + 0.5;
+  const y = Math.floor(p.y) + 0.5;
   ctx.save();
+  const area = new Path2D();
+  area.rect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  for (const r of exclude) area.rect(r.x, r.y, r.w, r.h);
+  ctx.clip(area, 'evenodd');
   ctx.strokeStyle = C.line;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([7, 6]);
@@ -214,12 +231,9 @@ export function drawEntryTag(ctx, position, yOf) {
   const b = entryTagBox(ctx, position, yOf);
   ctx.save();
   ctx.beginPath();
-  ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+  ctx.arc(p.x, p.y, DOT_R, 0, Math.PI * 2);
   ctx.fillStyle = C.violet;
   ctx.fill();
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = THEME.bg;
-  ctx.stroke();
 
   roundRect(ctx, b.x, b.y, b.w, b.h, 7);
   ctx.fillStyle = C.tagBg;
