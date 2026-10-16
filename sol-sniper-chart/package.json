@@ -8,6 +8,7 @@
     "video:original": "OVERLAY=0 sh scripts/render-video.sh",
     "still": "node scripts/render-still.js",
     "check": "node scripts/check-layout.js",
+    "check:pixels": "node scripts/check-pixels.js",
     "pnl-table": "node scripts/export-pnl-table.js",
     "fonts": "python3 scripts/make-tnum-font.py",
     "studio": "remotion studio src/remotion/index.jsx"

@@ -162,7 +162,8 @@ export function drawFrame(ctx, t, market, assets, position = null) {
   });
 
   if (pos?.open) {
-    // keep the entry line off every candle (body, 3 px minimum, wicks) and volume bar
+    // candle (body with its 3 px minimum, wicks) and volume-bar rectangles; the
+    // entry line stops 1 px short of each of them
     const candleRects = s.candles.map((k, i) => {
       let top = Math.min(yOf(k.o), yOf(k.c));
       let bh = Math.abs(yOf(k.c) - yOf(k.o));
@@ -170,9 +171,9 @@ export function drawFrame(ctx, t, market, assets, position = null) {
         top -= (3 - bh) / 2;
         bh = 3;
       }
-      const y0 = Math.min(yOf(k.h), top) - 2;
-      const y1 = Math.max(yOf(k.l), top + bh) + 2;
-      return { x: Math.round(slotX(i) - BODY_W / 2) - 1, y: y0, w: BODY_W + 2, h: y1 - y0 };
+      const y0 = Math.min(yOf(k.h), top);
+      const y1 = Math.max(yOf(k.l), top + bh);
+      return { x: Math.round(slotX(i) - BODY_W / 2), y: y0, w: BODY_W, h: y1 - y0 };
     });
     drawEntryLine(ctx, position, yOf, [...volRects, ...candleRects]);
   }

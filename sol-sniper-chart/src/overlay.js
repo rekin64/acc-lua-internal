@@ -16,6 +16,7 @@ const C = {
   label: '#8A97BF',
   value: '#F4F5F8',
   muted: '#56638B',
+  footnote: '#7280A8', // 4.9:1 on the panel, legible yet discreet
   brand: '#5B7BFB', // SOL Sniper wordmark blue (solsniper.com)
   violet: '#8777E0',
   violetText: '#C9C2FF',
@@ -172,7 +173,7 @@ export function drawPositionPanel(ctx, position, pos, assets) {
   separator(ctx, y);
 
   ctx.font = `500 16px ${TNUM}`;
-  ctx.fillStyle = C.muted;
+  ctx.fillStyle = C.footnote;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText('Simulated position · Excl. fees & slippage', X + PAD, y + FOOT_H / 2 + 1);
@@ -205,22 +206,46 @@ export function entryTagBox(ctx, position, yOf) {
   return { x: p.x - 10 - w, y: p.y - 16 - TAG_H, w, h: TAG_H };
 }
 
-// Dashed line at the entry price. `exclude` holds the frame's candle and
-// volume bar rectangles, so the line never touches the chart's own marks.
-export function drawEntryLine(ctx, position, yOf, exclude = []) {
+const DASH_ON = 7;
+const DASH_OFF = 6;
+const MIN_PIECE = 3; // drop dash fragments shorter than this (px)
+
+// Dash pieces of the entry line at the entry price, from the dot to the price
+// axis. `marks` holds the frame's candle and volume-bar rectangles: every
+// dash is cut 1 px short of any mark crossing the line, so the line never
+// touches a chart pixel, and fragments under MIN_PIECE px are dropped.
+export function entryLinePieces(position, yOf, marks = []) {
   const p = entryPoint(position, yOf);
-  const y = Math.floor(p.y) + 0.5;
+  const row = Math.floor(p.y);
+  const x0 = p.x + DOT_R + 2;
+  const x1 = SEP_X - 6;
+  // rows painted by a 1.5 px stroke centred on row + 0.5 (anti-aliasing included)
+  const top = row - 1;
+  const bottom = row + 2;
+  const blocked = marks
+    .filter((r) => r.y < bottom + 1 && r.y + r.h > top - 1)
+    .map((r) => [Math.floor(r.x) - 1, Math.ceil(r.x + r.w) + 1]);
+  const pieces = [];
+  for (let a = x0; a < x1; a += DASH_ON + DASH_OFF) {
+    let segs = [[a, Math.min(a + DASH_ON, x1)]];
+    for (const [ba, bb] of blocked) {
+      segs = segs.flatMap(([sa, sb]) => (bb <= sa || ba >= sb ? [[sa, sb]] : [[sa, Math.min(sb, ba)], [Math.max(sa, bb), sb]]));
+    }
+    for (const [sa, sb] of segs) if (sb - sa >= MIN_PIECE) pieces.push([sa, sb]);
+  }
+  return { y: row + 0.5, pieces };
+}
+
+export function drawEntryLine(ctx, position, yOf, marks = []) {
+  const { y, pieces } = entryLinePieces(position, yOf, marks);
   ctx.save();
-  const area = new Path2D();
-  area.rect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  for (const r of exclude) area.rect(r.x, r.y, r.w, r.h);
-  ctx.clip(area, 'evenodd');
   ctx.strokeStyle = C.line;
   ctx.lineWidth = 1.5;
-  ctx.setLineDash([7, 6]);
   ctx.beginPath();
-  ctx.moveTo(p.x, y);
-  ctx.lineTo(SEP_X - 6, y);
+  for (const [a, b] of pieces) {
+    ctx.moveTo(a, y);
+    ctx.lineTo(b, y);
+  }
   ctx.stroke();
   ctx.restore();
 }

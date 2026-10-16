@@ -45,11 +45,17 @@ position · Excl. fees & slippage").
   Final frames: $0.0001380 → $4,403.32, +$3,903.32, +780.66%. The ROI is
   measured from the entry, while the header % (+1,956%) is measured from the
   chart start.
-- Entry marker: a violet dashed line at the entry price, a dot on the entry
-  candle, and an `ENTRY — $500` tag.
-- `npm run check` verifies on all 600 frames that the panel and the tag never
-  cover a candle (glow included), a volume bar, the pills, the header or the
-  price axis.
+- Entry marker: a violet dot just left of the entry candle at the entry
+  price, a dashed line from the dot to the price axis, and an
+  `ENTRY — $500` tag. The line stops 1 px short of every candle and volume
+  bar, so the chart's own marks are never painted over.
+- `npm run check` verifies on all 600 frames that the panel (with its
+  shadow), the tag, the dot and the line never cover a candle, a volume bar,
+  the pills, the header or the price axis. Glow is included for the panel and
+  the tag.
+- `npm run check:pixels` renders all 600 frames losslessly with and without
+  the overlay. It confirms that 0 candle or volume-bar pixels change and that
+  nothing changes outside the overlay's own areas.
 
 ## Assets
 
@@ -72,6 +78,7 @@ npm install
 npm run video            # out/sol-sniper-useless-pnl.mp4
 npm run video:original   # out/sol-sniper-useless.mp4 (no overlay)
 npm run check            # frame-by-frame overlap check
+npm run check:pixels     # lossless proof that no chart pixel changes
 npm run pnl-table        # out/pnl-frames.csv
 node scripts/render-still.js 9.8 out/frame.png   # one frame, needs Playwright
 npm run studio           # live preview in Remotion Studio

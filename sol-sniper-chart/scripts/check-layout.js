@@ -1,6 +1,7 @@
-// Checks, frame by frame, that the PNL panel, the ENTRY tag and the entry dot
-// never cover a candle (wick and glow included), a volume bar or another UI
-// element, and that the tag stays inside the plot.
+// Checks, frame by frame, that the PNL panel (with its drop shadow), the ENTRY
+// tag, the entry dot and the dashed entry line never cover a candle (wick and
+// glow included for the panel and tag), a volume bar or another UI element,
+// and that the tag stays inside the plot.
 // Usage: node scripts/check-layout.js   (exit code 1 on any overlap)
 
 import { createServer } from 'node:http';
@@ -40,7 +41,7 @@ const report = await page.evaluate(async () => {
   const { buildPosition } = await import('/src/position.js');
   const { loadTnumFonts } = await import('/src/fonts.js');
   const ui = await import('/src/ui.js');
-  const { PNL_BOX, entryTagBox, entryPoint, entryDotBox } = await import('/src/overlay.js');
+  const { PNL_BOX, entryTagBox, entryPoint, entryDotBox, entryLinePieces } = await import('/src/overlay.js');
   await loadTnumFonts((f) => `/public/fonts/${f}`);
   const ctx = document.createElement('canvas').getContext('2d');
   const market = buildMarket();
@@ -58,9 +59,13 @@ const report = await page.evaluate(async () => {
     { name: 'price axis', x: ui.SEP_X, y: ui.PRICE_TOP - 24, w: 1920 - ui.SEP_X, h: ui.VOL_BOT - ui.PRICE_TOP + 24 },
     { name: 'header', x: 0, y: 0, w: 1920, h: 160 },
   ];
-  const worst = { panel: { gap: Infinity }, tag: { gap: Infinity }, dot: { gap: Infinity } };
-  if (PNL_BOX.y - (ui.PILL_Y + ui.PILL_H) <= 0) overlaps.push({ frame: -1, box: 'panel', with: 'pills' });
+  const worst = { panel: { gap: Infinity }, tag: { gap: Infinity }, dot: { gap: Infinity }, line: { gap: Infinity } };
   const overlaps = [];
+  if (PNL_BOX.y - (ui.PILL_Y + ui.PILL_H) <= 0) overlaps.push({ frame: -1, box: 'panel', with: 'pills' });
+  // panel plus its drop shadow: blur 28 (sigma 14, ~3 sigma = 42 px), offset y 10
+  const panelShadow = { x: PNL_BOX.x - 42, y: PNL_BOX.y - 32, w: PNL_BOX.w + 84, h: PNL_BOX.h + 84 };
+  // pixel footprint of a mark: fractional edges rounded outwards (anti-aliasing)
+  const px = (r) => ({ x: Math.floor(r.x), y: Math.floor(r.y), w: Math.ceil(r.x + r.w) - Math.floor(r.x), h: Math.ceil(r.y + r.h) - Math.floor(r.y) });
   let tagChecked = 0;
   for (let f = 0; f < FPS * DURATION; f++) {
     const t = f / FPS;
@@ -68,6 +73,7 @@ const report = await page.evaluate(async () => {
     const yOf = (p) => ui.PRICE_BOT - ((p - s.yMin) / (s.yMax - s.yMin)) * (ui.PRICE_BOT - ui.PRICE_TOP);
     const things = [...fixed];
     const bodies = [];
+    const marks = []; // exactly the rectangles render.js passes to drawEntryLine
     s.candles.forEach((k, i) => {
       const cx = ui.slotX(i);
       const glow = k.c >= k.o ? GLOW_UP : GLOW_DOWN;
@@ -82,11 +88,13 @@ const report = await page.evaluate(async () => {
       const bottom = Math.max(yOf(k.l), bTop + bh);
       const bx = Math.round(cx - ui.BODY_W / 2);
       bodies.push({ name: `candle ${i} (no glow)`, x: bx, y: top, w: ui.BODY_W, h: bottom - top });
+      marks.push({ name: `candle ${i}`, x: bx, y: top, w: ui.BODY_W, h: bottom - top });
       things.push({ name: `candle ${i}`, x: bx - glow, y: top - glow, w: ui.BODY_W + 2 * glow, h: bottom - top + 2 * glow });
       const vh = Math.max(3, (k.v / s.vMax) * ui.VOL_H);
       things.push({ name: `volume ${i}`, x: cx - ui.VOL_W / 2, y: ui.VOL_BOT - vh, w: ui.VOL_W, h: vh });
+      marks.push({ name: `volume ${i}`, x: cx - ui.VOL_W / 2, y: ui.VOL_BOT - vh, w: ui.VOL_W, h: vh });
     });
-    const boxes = [['panel', PNL_BOX]];
+    const boxes = [['panel', panelShadow]];
     if (position.at(t).open) {
       const tag = entryTagBox(ctx, position, yOf);
       boxes.push(['tag', tag]);
@@ -100,6 +108,16 @@ const report = await page.evaluate(async () => {
         const g = gapOf(dot, th);
         if (g < 0) overlaps.push({ frame: f, box: 'dot', with: th.name });
         if (g < worst.dot.gap) worst.dot = { gap: Math.round(g * 10) / 10, frame: f, with: th.name };
+      }
+      // every dash piece (rows painted incl. anti-aliasing) vs every mark's pixel footprint
+      const { y: ly, pieces } = entryLinePieces(position, yOf, marks);
+      for (const [a, b] of pieces) {
+        const seg = { x: Math.floor(a), y: Math.floor(ly) - 1, w: Math.ceil(b) - Math.floor(a), h: 3 };
+        for (const m of marks) {
+          const g = gapOf(seg, px(m));
+          if (g < 0) overlaps.push({ frame: f, box: 'line', with: m.name });
+          if (g < worst.line.gap) worst.line = { gap: Math.round(g * 10) / 10, frame: f, with: m.name };
+        }
       }
     }
     for (const [name, box] of boxes) {
