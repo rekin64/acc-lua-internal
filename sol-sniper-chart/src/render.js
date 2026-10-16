@@ -1,77 +1,35 @@
 // Canvas 2D renderer: draws one frame of the chart at time t (seconds).
-// Pure function of (t, market, assets) so every frame is reproducible.
-// Colours and proportions are measured from the reference capture (IMAGE 1).
+// Pure function of (t, market, assets[, position]) so every frame is
+// reproducible. Without a position, the output is the original chart.
 
 import { W, H, SLOTS } from './engine.js';
+import { formatPct, formatPrice } from './format.js';
+import { drawEntryLine, drawEntryTag, drawPositionPanel } from './overlay.js';
+import {
+  THEME,
+  PANEL,
+  SEP_X,
+  BODY_W,
+  WICK_W,
+  VOL_W,
+  PRICE_TOP,
+  PRICE_BOT,
+  VOL_BOT,
+  VOL_H,
+  AXIS_X,
+  RIGHT,
+  HEADER_CY,
+  PILL_Y,
+  PILL_H,
+  PILLS,
+  PILL_ON,
+  FONT,
+  FIRST_MINUTE,
+  slotX,
+  roundRect,
+} from './ui.js';
 
-export const THEME = {
-  outside: '#01040B',
-  bg: '#030917',
-  up: '#6EF0CC',
-  upGlow: 'rgba(110, 240, 205, 0.45)',
-  down: '#E94E67',
-  downGlow: 'rgba(233, 78, 103, 0.30)',
-  price: '#70F0C6',
-  title: '#F4F5F8',
-  link: '#3D71B8',
-  pillIdleBg: '#071025',
-  pillIdleText: '#8090B8',
-  pillOnBg: '#3B66F0',
-  pillOnText: '#FFFFFF',
-  axis: '#8A97BF',
-  faint: '#3E4868',
-  grid: 'rgba(130, 150, 210, 0.10)',
-  separator: '#1C2440',
-  volUpTop: '#377E8C',
-  volUpBot: '#28487A',
-  volDownTop: '#6A30A8',
-  volDownBot: '#3A1E76',
-};
-
-// ---- layout (1920 x 1080) ----------------------------------------------------
-const PANEL = { x: 10, y: 10, w: W - 20, h: H - 20, r: 26 };
-const X0 = 36; // first slot left edge
-const SEP_X = 1690; // separator between plot and price axis
-const PITCH = (SEP_X - 2 - X0) / SLOTS;
-const BODY_W = Math.round(PITCH * 0.58);
-const WICK_W = 3;
-const VOL_W = Math.round(PITCH * 0.82);
-const PRICE_TOP = 196;
-const PRICE_BOT = 948;
-const VOL_BOT = 1008;
-const VOL_H = 175;
-const AXIS_X = 1712;
-const RIGHT = 1872;
-const HEADER_CY = 103;
-const PILL_Y = 182;
-const PILL_H = 58;
-const PILLS = ['1s', '1m', '5m', '15m', '1h'];
-const PILL_ON = 1;
-const FONT = 'Inter, "Inter Display", system-ui, sans-serif';
-const FIRST_MINUTE = 13 * 60 + 52; // time label of the first historical candle
-
-const slotX = (i) => X0 + (i + 0.5) * PITCH;
-
-function roundRect(ctx, x, y, w, h, r) {
-  const rr = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
-}
-
-export function formatPrice(p) {
-  const decimals = Math.max(2, 3 - Math.floor(Math.log10(p))); // 4 significant digits
-  return '$' + p.toFixed(decimals);
-}
-
-export function formatPct(pct) {
-  const r = Math.round(pct);
-  return (r >= 0 ? '+' : '-') + Math.abs(r).toLocaleString('en-US') + '%';
-}
+export { THEME } from './ui.js';
 
 function niceStep(range, target) {
   const rough = range / target;
@@ -105,8 +63,9 @@ function drawExternalLink(ctx, x, y, s, color) {
   ctx.restore();
 }
 
-export function drawFrame(ctx, t, market, assets) {
+export function drawFrame(ctx, t, market, assets, position = null) {
   const s = market.stateAt(t);
+  const pos = position ? position.at(t) : null;
   const T = THEME;
   const yOf = (p) => PRICE_BOT - ((p - s.yMin) / (s.yMax - s.yMin)) * (PRICE_BOT - PRICE_TOP);
   const vOf = (v) => (v / s.vMax) * VOL_H;
@@ -200,6 +159,8 @@ export function drawFrame(ctx, t, market, assets) {
     ctx.globalAlpha = 1;
   });
 
+  if (pos?.open) drawEntryLine(ctx, position, yOf);
+
   // ---- candles -----------------------------------------------------------
   s.candles.forEach((k, i) => {
     const up = k.c >= k.o;
@@ -224,6 +185,8 @@ export function drawFrame(ctx, t, market, assets) {
     ctx.fill();
     ctx.restore();
   });
+
+  if (pos?.open) drawEntryTag(ctx, position, yOf);
 
   // ---- header ------------------------------------------------------------
   const logo = assets.logo;
@@ -276,6 +239,8 @@ export function drawFrame(ctx, t, market, assets) {
     ctx.fillText(label, px + w / 2, PILL_Y + PILL_H / 2 + 1);
     px += w + 12;
   });
+
+  if (position) drawPositionPanel(ctx, position, pos, assets);
 
   ctx.restore(); // panel clip
 

@@ -4,8 +4,12 @@
   "type": "module",
   "description": "SOL Sniper candlestick chart video (synthetic data)",
   "scripts": {
-    "still": "node scripts/render-still.js",
     "video": "sh scripts/render-video.sh",
+    "video:original": "OVERLAY=0 sh scripts/render-video.sh",
+    "still": "node scripts/render-still.js",
+    "check": "node scripts/check-layout.js",
+    "pnl-table": "node scripts/export-pnl-table.js",
+    "fonts": "python3 scripts/make-tnum-font.py",
     "studio": "remotion studio src/remotion/index.jsx"
   },
   "dependencies": {

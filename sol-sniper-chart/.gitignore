@@ -2,3 +2,6 @@ node_modules/
 out/*
 !out/preview_t8.png
 !out/sol-sniper-useless.mp4
+!out/sol-sniper-useless-pnl.mp4
+!out/sol-sniper-useless-pnl.jpg
+!out/pnl-frames.csv

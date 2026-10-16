@@ -11,5 +11,6 @@ export const Root = () => (
     height={H}
     fps={FPS}
     durationInFrames={FPS * DURATION}
+    defaultProps={{ overlay: true }}
   />
 );
