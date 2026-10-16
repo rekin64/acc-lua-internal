@@ -105,7 +105,7 @@ function drawExternalLink(ctx, x, y, s, color) {
   ctx.restore();
 }
 
-export function drawFrame(ctx, t, market, assets, opts = {}) {
+export function drawFrame(ctx, t, market, assets) {
   const s = market.stateAt(t);
   const T = THEME;
   const yOf = (p) => PRICE_BOT - ((p - s.yMin) / (s.yMax - s.yMin)) * (PRICE_BOT - PRICE_TOP);
@@ -276,15 +276,6 @@ export function drawFrame(ctx, t, market, assets, opts = {}) {
     ctx.fillText(label, px + w / 2, PILL_Y + PILL_H / 2 + 1);
     px += w + 12;
   });
-
-  // honest labelling: this is a simulation, not a real result
-  if (opts.disclaimer !== false) {
-    ctx.font = `500 20px ${FONT}`;
-    ctx.fillStyle = T.faint;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText('Simulated data', RIGHT, VOL_BOT + 36);
-  }
 
   ctx.restore(); // panel clip
 

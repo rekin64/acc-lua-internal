@@ -14,7 +14,8 @@ the video is pixel-identical to it.
 
 All prices are **synthetic** and come from a fixed seed. They visualise a
 memecoin pump and are not real market data or a result obtained with SOL
-Sniper. The frame carries a discreet `Simulated data` mark.
+Sniper. The frame itself carries no disclaimer, so say so wherever the video
+is published.
 
 - 30 historical candles are on the chart at t = 0. 16 new candles form over
   the 10 s: calm (0-2 s), buyers arrive (2-4 s), breakout (4-7 s), parabolic
