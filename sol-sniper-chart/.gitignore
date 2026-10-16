@@ -1,3 +1,4 @@
 node_modules/
 out/*
 !out/preview_t8.png
+!out/sol-sniper-useless.mp4

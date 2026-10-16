@@ -4,6 +4,14 @@
   "type": "module",
   "description": "SOL Sniper candlestick chart video (synthetic data)",
   "scripts": {
-    "still": "node scripts/render-still.js"
+    "still": "node scripts/render-still.js",
+    "video": "sh scripts/render-video.sh",
+    "studio": "remotion studio src/remotion/index.jsx"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.532",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.532"
   }
 }
