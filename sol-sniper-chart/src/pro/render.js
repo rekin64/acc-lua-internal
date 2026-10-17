@@ -3,13 +3,13 @@
 
 import { centsToString, formatPctBp, formatUsdCents, priceDecimals } from '../format.js';
 import { roundRect } from '../ui.js';
-import { SLOTS } from './market.js';
+import { REPLAY_SPEED, SLOTS } from './market.js';
 
 const UI = 'Inter, system-ui, sans-serif';
 const NUM = '"Inter Tnum", Inter, system-ui, sans-serif';
 
-// Indigo / navy theme. Violet is reserved for the simulated position (entry
-// line, entry tag, SIMULATED chip); blue marks selected UI controls.
+// Indigo / navy theme. Violet is reserved for the position (entry line, entry
+// tag, entry price dot); blue marks selected UI controls.
 export const C = {
   bg: '#05060F',
   nav: '#080A18',
@@ -26,7 +26,6 @@ export const C = {
   upBg: 'rgba(54, 224, 181, 0.12)',
   downBg: 'rgba(240, 71, 95, 0.12)',
   violet: '#8B7BF0',
-  violetText: '#C2B8FB',
   blue: '#5B7BFB',
   activeBg: 'rgba(91, 123, 251, 0.16)',
   activeText: '#B4C3FF',
@@ -71,7 +70,6 @@ function compactNum(v) {
 }
 const group = (n) => n.toLocaleString('en-US');
 const usd2 = (v) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const easeOut = (k) => 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
 
 function text(ctx, s, x, y, { font = `500 15px ${UI}`, color = C.text, align = 'left', base = 'middle', spacing = '0px' } = {}) {
   ctx.font = font;
@@ -212,9 +210,39 @@ function drawNav(ctx, assets, icons) {
   icon(ctx, icons, 'circle-user', 1882, 30, 26);
   icon(ctx, icons, 'settings', 1836, 30, 20);
   icon(ctx, icons, 'bell', 1796, 30, 20);
-  pill(ctx, 1690, 13, 82, 34, { fill: C.field, stroke: C.border, r: 9 });
-  text(ctx, 'SOL', 1707, 30.5, { font: `600 14px ${UI}` });
-  icon(ctx, icons, 'chevron-down', 1752, 30, 16);
+  drawWallet(ctx, assets, icons, 1772);
+}
+
+// Wallet chip: official SOL logo, balance and wallet name (fictitious balance).
+function drawWallet(ctx, assets, icons, right) {
+  const BAL = `600 15px ${NUM}`;
+  const UNIT = `500 15px ${UI}`;
+  const NAME = `500 14px ${UI}`;
+  const bw = measure(ctx, '154.5', BAL) + 5 + measure(ctx, 'SOL', UNIT);
+  const nw = measure(ctx, 'Wallet 01', NAME);
+  const w = 10 + 24 + 10 + bw + 13 + 1 + 13 + nw + 6 + 14 + 10;
+  const x = right - w;
+  const y = 11;
+  const h = 38;
+  const cy = y + h / 2;
+  pill(ctx, x, y, w, h, { fill: C.field, stroke: C.border, r: 10 });
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, 'rgba(150, 165, 255, 0.05)');
+  g.addColorStop(1, 'rgba(150, 165, 255, 0)');
+  pill(ctx, x + 1, y + 1, w - 2, h - 2, { fill: g, r: 9 });
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x + 10 + 12, cy, 12, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.drawImage(assets.sol, x + 10, cy - 12, 24, 24);
+  ctx.restore();
+  let tx = x + 10 + 24 + 10;
+  tx += text(ctx, '154.5', tx, cy + 0.5, { font: BAL }) + 5;
+  tx += text(ctx, 'SOL', tx, cy + 0.5, { font: UNIT, color: C.text2 }) + 13;
+  vline(ctx, tx, cy - 10, cy + 10, C.border);
+  tx += 1 + 13;
+  tx += text(ctx, 'Wallet 01', tx, cy + 0.5, { font: NAME, color: C.text2 }) + 6;
+  icon(ctx, icons, 'chevron-down', tx + 7, cy, 14);
 }
 
 // ---- token bar: fixed anchors so values never shift while they tick -------------------
@@ -375,7 +403,7 @@ export function buyMarker(ctx, position, yOf) {
   return { x: right - w, y: ay - 26 - h, w, h, label, ax, ay };
 }
 
-function drawChart(ctx, s, position, pos, assets, icons) {
+function drawChart(ctx, s, position, pos, icons) {
   panel(ctx, CHART);
   drawToolbar(ctx, icons);
   drawTools(ctx, icons);
@@ -388,15 +416,6 @@ function drawChart(ctx, s, position, pos, assets, icons) {
   ctx.beginPath();
   ctx.rect(PLOT.x, PLOT.y, AXIS_R - PLOT.x, PLOT.h);
   ctx.clip();
-
-  // faint brand watermark in the price pane (TradingView-style)
-  {
-    const ww = 360;
-    const wh = (assets.logo.height / assets.logo.width) * ww;
-    ctx.globalAlpha = 0.045;
-    ctx.drawImage(assets.logo, PLOT.x + PLOT.w / 2 - ww / 2, (PRICE_TOP + PRICE_BOT) / 2 - wh / 2, ww, wh);
-    ctx.globalAlpha = 1;
-  }
 
   // grid
   const levels = logLevels(pOf(plotB - 12), pOf(PLOT.y + 12), yOf, 56);
@@ -559,7 +578,16 @@ function drawChart(ctx, s, position, pos, assets, icons) {
   rr -= text(ctx, 'log', rr, ry, { font: `600 14px ${UI}`, color: C.activeText, align: 'right' }) + 16;
   rr -= text(ctx, '%', rr, ry, { font: `500 14px ${UI}`, color: C.text2, align: 'right' }) + 18;
   vline(ctx, rr, ry - 10, ry + 10);
-  text(ctx, `${s.clock} (UTC)`, rr - 18, ry, { font: `500 14px ${NUM}`, color: C.text2, align: 'right' });
+  rr -= 18;
+  rr -= text(ctx, `${s.clock} (UTC)`, rr, ry, { font: `500 14px ${NUM}`, color: C.text2, align: 'right' }) + 14;
+  // 1 s candles are replayed at 2x: 2 chart seconds per video second
+  const speed = `${REPLAY_SPEED}×`;
+  const rw = 10 + 12 + 6 + measure(ctx, 'Replay', `500 14px ${UI}`) + 5 + measure(ctx, speed, `600 14px ${NUM}`) + 10;
+  pill(ctx, rr - rw, ry - 12, rw, 24, { fill: C.field, stroke: C.border, r: 6 });
+  icon(ctx, icons, 'play', rr - rw + 10 + 6, ry, 12, 'active');
+  let px = rr - rw + 10 + 12 + 6;
+  px += text(ctx, 'Replay', px, ry + 0.5, { font: `500 14px ${UI}`, color: C.text2 }) + 5;
+  text(ctx, speed, px, ry + 0.5, { font: `600 14px ${NUM}`, color: C.text });
 }
 
 // ---- sidebar -------------------------------------------------------------------------
@@ -593,8 +621,7 @@ function drawPosition(ctx, position, pos) {
   const L = r.x + 20;
   const R = r.x + r.w - 20;
   text(ctx, 'Position', L, r.y + 27, { font: `600 16px ${UI}` });
-  const w1 = chip(ctx, pos.open ? 'OPEN' : 'NO POSITION', R, r.y + 27, pos.open ? { fill: C.activeBg, color: C.activeText, stroke: 'rgba(91, 123, 251, 0.45)' } : { fill: 'rgba(154, 163, 199, 0.10)', color: C.text2 });
-  chip(ctx, 'SIMULATED', R - w1 - 8, r.y + 27, { fill: 'rgba(139, 123, 240, 0.13)', color: C.violetText });
+  chip(ctx, pos.open ? 'OPEN' : 'NO POSITION', R, r.y + 27, pos.open ? { fill: C.activeBg, color: C.activeText, stroke: 'rgba(91, 123, 251, 0.45)' } : { fill: 'rgba(154, 163, 199, 0.10)', color: C.text2 });
   hline(ctx, r.x, r.x + r.w, r.y + 53);
 
   const dash = '—';
@@ -633,11 +660,10 @@ function drawPosition(ctx, position, pos) {
   text(ctx, pos.open ? centsToString(position.tokensHundredths) : dash, R, r.y + 302, { font: `600 16px ${NUM}`, color: pos.open ? C.text : C.text3, align: 'right' });
 }
 
-// Simulated tape, newest first. Like a live terminal, a new trade is inserted
-// at the top at once (the top row is always the last trade), fades in over
-// 120 ms and its row flashes briefly.
+// Trades tape, newest first. Like a live terminal, a new trade is inserted at
+// the top at once (the top row is always the last trade) and its row flashes
+// briefly.
 const ROW_H = 30;
-const FADE_S = 0.12;
 const FLASH_S = 0.5;
 function drawTrades(ctx, s, t) {
   const r = TRADES;
@@ -650,7 +676,6 @@ function drawTrades(ctx, s, t) {
     if (i === 0) pill(ctx, x, r.y + 47, w, 2, { fill: C.blue, r: 1 });
     x += w + 26;
   });
-  text(ctx, 'simulated', R, r.y + 25, { font: `500 12px ${UI}`, color: C.text3, align: 'right' });
   hline(ctx, r.x, r.x + r.w, r.y + 49);
   const cols = { age: L, type: L + 50, mc: L + 118, amount: L + 296, value: R };
   const hy = r.y + 68;
@@ -677,7 +702,6 @@ function drawTrades(ctx, s, t) {
       ctx.fillStyle = buy ? `rgba(54, 224, 181, ${(0.12 * (1 - fk)).toFixed(3)})` : `rgba(240, 71, 95, ${(0.12 * (1 - fk)).toFixed(3)})`;
       ctx.fillRect(r.x + 1, y - ROW_H / 2, r.w - 2, ROW_H);
     }
-    ctx.globalAlpha = 0.35 + 0.65 * easeOut((t - tr.tv) / FADE_S);
     const bw = Math.min(100, Math.max(16, 16 + (Math.log10(Math.max(1, tr.usd)) / Math.log10(3000)) * 84));
     pill(ctx, R + 6 - bw, y - 11, bw, 22, { fill: buy ? 'rgba(54, 224, 181, 0.09)' : 'rgba(240, 71, 95, 0.10)', r: 4 });
     text(ctx, `${tr.age}s`, cols.age, y, { font: `500 15px ${NUM}`, color: C.text3 });
@@ -685,7 +709,6 @@ function drawTrades(ctx, s, t) {
     text(ctx, compactUsd(tr.price * 1e9), cols.mc, y, { font: `500 15px ${NUM}`, color: C.text });
     text(ctx, compactNum(tr.tokens), cols.amount, y, { font: `500 15px ${NUM}`, color: C.text2, align: 'right' });
     text(ctx, usd2(tr.usd), cols.value, y, { font: `600 15px ${NUM}`, color: c, align: 'right' });
-    ctx.globalAlpha = 1;
   });
   // older rows fade out at the bottom edge of the list
   const fb = r.y + r.h - 8;
@@ -697,26 +720,14 @@ function drawTrades(ctx, s, t) {
   ctx.restore();
 }
 
-// ---- status bar -------------------------------------------------------------------------
-function drawStatus(ctx, t) {
+// ---- footer: the one notice that the data is fictitious ----------------------------------
+function drawStatus(ctx, icons) {
   ctx.fillStyle = C.nav;
   ctx.fillRect(0, STATUS_Y, 1920, 1080 - STATUS_Y);
   hline(ctx, 0, 1920, STATUS_Y, C.border);
   const cy = STATUS_Y + 18;
-  const label = 'Simulation Running';
-  const w = measure(ctx, label, `500 13px ${UI}`) + 40;
-  pill(ctx, 12, cy - 12, w, 24, { fill: 'rgba(54, 224, 181, 0.07)', stroke: 'rgba(54, 224, 181, 0.26)' });
-  const ph = (t % 2) / 2;
-  ctx.beginPath();
-  ctx.arc(28, cy, 4 + 5 * (1 - (1 - ph) * (1 - ph)), 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(54, 224, 181, ${(0.25 * (1 - ph)).toFixed(3)})`;
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(28, cy, 4, 0, Math.PI * 2);
-  ctx.fillStyle = C.up;
-  ctx.fill();
-  text(ctx, label, 40, cy + 0.5, { font: `500 13px ${UI}`, color: '#CBD2EA' });
-  text(ctx, 'Simulated data · not financial results', 1908, cy + 0.5, { font: `500 14px ${UI}`, color: C.text2, align: 'right' });
+  icon(ctx, icons, 'info', 24, cy, 15);
+  text(ctx, 'Simulated data · prices, trades, wallet balance and PNL are fictitious', 40, cy + 0.5, { font: `500 14px ${UI}`, color: C.text2 });
 }
 
 export function drawProFrame(ctx, t, market, position, assets, icons) {
@@ -727,10 +738,10 @@ export function drawProFrame(ctx, t, market, position, assets, icons) {
   ctx.fillRect(0, 0, 1920, 1080);
   drawNav(ctx, assets, icons);
   drawTokenBar(ctx, s, assets, icons);
-  drawChart(ctx, s, position, pos, assets, icons);
+  drawChart(ctx, s, position, pos, icons);
   drawActivity(ctx, s);
   if (pos) drawPosition(ctx, position, pos);
   drawTrades(ctx, s, t);
-  drawStatus(ctx, t);
+  drawStatus(ctx, icons);
   ctx.restore();
 }

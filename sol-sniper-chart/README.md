@@ -74,6 +74,10 @@ position · Excl. fees & slippage").
 - `public/assets/useless.png`: the official USELESS COIN icon (mint
   `Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk`), from CoinGecko, matching
   DexScreener.
+- `public/assets/solana-sol.png`: the official SOL logo, unmodified, from the
+  Solana Labs token list
+  (`solana-labs/token-list`, `assets/mainnet/So11111111111111111111111111111111111111112/logo.png`).
+  Used in the wallet chip of the pro layout.
 - `public/fonts/InterTnum-*.otf`: Inter with tabular digits as the default
   (made by `scripts/make-tnum-font.py`), so the panel figures never shift
   sideways. Canvas cannot enable the `tnum` feature itself. SIL OFL 1.1, see

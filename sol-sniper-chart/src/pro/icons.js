@@ -5,7 +5,7 @@ export const ICONS = [
   'search', 'chevron-down', 'star', 'bell', 'settings', 'circle-user', 'crosshair', 'pen-line', 'rows-3',
   'pencil', 'type', 'ruler', 'zoom-in', 'magnet', 'lock', 'eye', 'trash-2', 'smile', 'chart-candlestick',
   'square-function', 'layout-grid', 'maximize', 'camera', 'undo-2', 'redo-2', 'copy', 'globe', 'calendar',
-  'share-2', 'sliders-horizontal', 'zap', 'spline', 'external-link',
+  'share-2', 'sliders-horizontal', 'zap', 'spline', 'external-link', 'info', 'play',
 ];
 
 export const ICON_COLORS = {

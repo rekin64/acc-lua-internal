@@ -13,12 +13,15 @@
 import { DURATION, SAMPLE_HZ, gauss, makePath, mulberry32 } from '../engine.js';
 
 export const CANDLE_S = 0.5; // video seconds per 1 s candle (2x speed)
+export const REPLAY_SPEED = 1 / CANDLE_S; // chart seconds per video second (shown as "Replay 2x")
 export const HIST = 300; // 1 s candles before t = 0 (5 min, feeds the 5m stats)
 export const VIS_HIST = 76; // of which drawn on the chart
 export const LIVE = Math.round(DURATION / CANDLE_S); // 20 candles form during the video
 export const SLOTS = 100; // fixed x slots: 76 history + 20 live + right margin
 export const SUPPLY = 1e9; // USELESS total supply
 const ENTRY_PRICE = 0.00001567; // last trade when the simulated position opens (t = 0.5 s)
+const FINAL_PRICE = 0.0001025; // last trade of the video (closes the last candle at t = 9.98 s)
+const RISE_FROM = 8; // first candle of the final run (t = 4 s)
 const POOL_USD_AT_ENTRY = 5000; // USD side of the pool at the entry price
 export const CLOCK0 = 14 * 3600 + 30 * 60 + 40; // chart clock of history candle 0 (14:30:40)
 
@@ -47,20 +50,21 @@ const LIVE_SCRIPT = [
   { ret: +0.09, uw: 0.025, lw: 0.008, rate: 8 },
   { ret: -0.02, uw: 0.01, lw: 0.02, rate: 7 },
   { ret: +0.13, uw: 0.05, lw: 0.006, rate: 9 },
-  // 4 - 7 s: breakout, a two-candle pullback, a doji, then expansion
-  { ret: +0.18, uw: 0.06, lw: 0.01, rate: 10 },
-  { ret: +0.28, uw: 0.09, lw: 0.012, rate: 12 },
-  { ret: -0.07, uw: 0.015, lw: 0.04, rate: 11 },
-  { ret: -0.04, uw: 0.02, lw: 0.03, rate: 10 },
-  { ret: +0.01, uw: 0.05, lw: 0.04, rate: 9 },
-  { ret: +0.3, uw: 0.06, lw: 0.012, rate: 12 },
-  // 7 - 10 s: parabolic, with a spinning top and a sharp rejection candle
-  { ret: +0.32, uw: 0.08, lw: 0.012, rate: 13 },
-  { ret: +0.07, uw: 0.07, lw: 0.05, rate: 12 },
-  { ret: +0.36, uw: 0.05, lw: 0.015, rate: 14 },
-  { ret: -0.1, uw: 0.1, lw: 0.03, rate: 14 },
-  { ret: +0.32, uw: 0.06, lw: 0.012, rate: 14 },
-  { ret: +0.24, uw: 0.06, lw: 0.012, rate: 14 }, // still forming at the end
+  // 4 - 10 s: final run. Impulses of different sizes, short pullbacks, one
+  // indecision candle and one rejection; wicks vary (dips bought, profit
+  // taking). Up-moves are rescaled below so the run ends on FINAL_PRICE.
+  { ret: +0.17, uw: 0.05, lw: 0.012, rate: 10 }, // breakout, upper wick
+  { ret: +0.31, uw: 0.03, lw: 0.02, rate: 12 }, // impulse
+  { ret: -0.06, uw: 0.015, lw: 0.07, rate: 12 }, // pullback, dip bought (long lower wick)
+  { ret: +0.13, uw: 0.085, lw: 0.01, rate: 11 }, // up, profit taking (long upper wick)
+  { ret: -0.035, uw: 0.03, lw: 0.025, rate: 9 }, // small pause
+  { ret: +0.36, uw: 0.035, lw: 0.02, rate: 13 }, // impulse
+  { ret: +0.21, uw: 0.1, lw: 0.015, rate: 14 }, // up, long upper wick
+  { ret: -0.09, uw: 0.02, lw: 0.055, rate: 13 }, // correction
+  { ret: +0.05, uw: 0.07, lw: 0.05, rate: 11 }, // spinning top
+  { ret: +0.38, uw: 0.03, lw: 0.02, rate: 14 }, // impulse
+  { ret: -0.07, uw: 0.12, lw: 0.035, rate: 14 }, // rejection (long upper wick)
+  { ret: +0.33, uw: 0.04, lw: 0.03, rate: 14 }, // final push, closes at t = 9.98 s
 ];
 
 const fmtClock = (sec) => {
@@ -70,9 +74,9 @@ const fmtClock = (sec) => {
 
 // Sorted trade times in [0, 1) for a candle, always including the path's
 // extremes and its close, so the candle's high, low and close are real trades.
-function tradeFractions(rng, n, mustHave) {
+function tradeFractions(rng, n, mustHave, hi = 0.98) {
   const fr = new Set(mustHave.map((x) => Math.min(0.999, Math.max(0.001, x))));
-  while (fr.size < n + mustHave.length) fr.add(0.02 + 0.96 * rng());
+  while (fr.size < n + mustHave.length) fr.add(0.02 + (hi - 0.02) * rng());
   return [...fr].sort((a, b) => a - b);
 }
 
@@ -147,11 +151,23 @@ export function buildProMarket({ seed = 7, histSeed = 3, tradeSeed = 11 } = {}) 
     candles.push({ o, h: Math.max(...ps), l: Math.min(...ps), c: last, usd: ts.reduce((a, tr) => a + tr.usd, 0) });
   });
 
+  // The final run is rescaled so the video ends exactly on FINAL_PRICE: its
+  // up-moves are stretched by one common factor, pullbacks keep their depth.
+  const logRet = LIVE_SCRIPT.map((s) => Math.log(1 + s.ret));
+  const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+  const run = logRet.slice(RISE_FROM, LIVE);
+  const need = Math.log(FINAL_PRICE / ENTRY_PRICE) - sum(logRet.slice(1, RISE_FROM));
+  const stretch = (need - sum(run.filter((x) => x < 0))) / sum(run.filter((x) => x > 0));
+
   // live: tick paths from the shared path generator, sampled at trade times
   const live = [];
   LIVE_SCRIPT.forEach((s, j) => {
     const o = last;
-    const c = j === 0 ? ENTRY_PRICE : o * (1 + s.ret);
+    const lastCandle = j === LIVE - 1;
+    let c = o * (1 + s.ret);
+    if (j === 0) c = ENTRY_PRICE;
+    else if (lastCandle) c = FINAL_PRICE;
+    else if (j >= RISE_FROM && s.ret > 0) c = o * Math.exp(logRet[j] * stretch);
     const hiT = Math.max(o, c) * (1 + s.uw * (0.85 + 0.3 * rng()));
     const loT = Math.min(o, c) * (1 - s.lw * (0.85 + 0.3 * rng()));
     const path = makePath(o, c, hiT, loT, CANDLE_S, rng);
@@ -163,17 +179,19 @@ export function buildProMarket({ seed = 7, histSeed = 3, tradeSeed = 11 } = {}) 
       if (path[i] < path[iMin]) iMin = i;
     }
     const n = Math.max(1, Math.round(s.rate * CANDLE_S * (0.8 + 0.4 * trng())));
-    // extremes before the close, so the close (at 0.98) is the candle's last trade
-    const fr = tradeFractions(trng, n, [Math.min(0.96, iMax / N), Math.min(0.96, iMin / N), 0.98]);
+    // extremes before the close, so the close is the candle's last trade; the
+    // last candle closes at 0.955 (t = 9.98 s), before the video's last frame
+    const cf = lastCandle ? 0.955 : 0.98;
+    const fr = tradeFractions(trng, n, [Math.min(cf - 0.02, iMax / N), Math.min(cf - 0.02, iMin / N), cf], cf);
     const t0 = j * CANDLE_S;
     const churn = Math.min(0.55, Math.abs(s.ret) * 2.2); // profit-taking grows with the move
     fr.forEach((f, q) => {
-      const p = f >= 0.98 ? c : path[Math.round(f * N)];
+      const p = f >= cf ? c : path[Math.round(f * N)];
       const prev = last;
       push(HIST + j, t0 + f * CANDLE_S, HIST + j + f, p);
       // after a buy, some holders sell part of the move back (never on the close)
-      const next = q + 1 < fr.length ? fr[q + 1] : 0.98;
-      if (f < 0.98 && p > prev && trng() < churn && next - f > 0.03) {
+      const next = q + 1 < fr.length ? fr[q + 1] : cf;
+      if (f < cf && p > prev && trng() < churn && next - f > 0.03) {
         const back = Math.max(loT, p - (0.35 + 0.3 * trng()) * (p - prev));
         push(HIST + j, t0 + (f + 0.45 * (next - f)) * CANDLE_S, HIST + j + f + 0.45 * (next - f), back);
       }
