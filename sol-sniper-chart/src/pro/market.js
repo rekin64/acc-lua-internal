@@ -13,14 +13,14 @@
 import { DURATION, SAMPLE_HZ, gauss, makePath, mulberry32 } from '../engine.js';
 
 export const CANDLE_S = 0.5; // video seconds per 1 s candle (2x speed)
-export const REPLAY_SPEED = 1 / CANDLE_S; // chart seconds per video second (shown as "Replay 2x")
+export const PLAYBACK_SPEED = 1 / CANDLE_S; // chart seconds per video second (shown as "Speed 2x")
 export const HIST = 300; // 1 s candles before t = 0 (5 min, feeds the 5m stats)
 export const VIS_HIST = 76; // of which drawn on the chart
 export const LIVE = Math.round(DURATION / CANDLE_S); // 20 candles form during the video
 export const SLOTS = 100; // fixed x slots: 76 history + 20 live + right margin
 export const SUPPLY = 1e9; // USELESS total supply
 const ENTRY_PRICE = 0.00001567; // last trade when the simulated position opens (t = 0.5 s)
-const FINAL_PRICE = 0.0001025; // last trade of the video (closes the last candle at t = 9.98 s)
+const FINAL_PRICE = 0.0001043; // last trade of the video (closes the last candle at t = 9.9 s)
 const RISE_FROM = 8; // first candle of the final run (t = 4 s)
 const POOL_USD_AT_ENTRY = 5000; // USD side of the pool at the entry price
 export const CLOCK0 = 14 * 3600 + 30 * 60 + 40; // chart clock of history candle 0 (14:30:40)
@@ -36,9 +36,10 @@ const HIST_SEGMENTS = [
   { n: 18, ret: 0.07, vol: 0.012, wick: 1.0, rate: 1.6 }, // base, higher lows
 ];
 
-// Live candles: ret = close/open - 1, uw/lw = wick extensions, rate = trades
-// per video second. Dojis, two-candle pullbacks and rejection wicks keep the
-// pump from looking mechanical.
+// Live candles: ret = scripted close/open - 1 (up-moves of the final run are
+// rescaled, see below), uw/lw = wick extensions, rate = trades per video
+// second. Pullbacks, indecision candles and rejection wicks keep the pump
+// from looking mechanical.
 const LIVE_SCRIPT = [
   // 0 - 2 s: calm; the position opens on the close of the first candle
   { ret: +0.008, uw: 0.012, lw: 0.014, rate: 6 },
@@ -50,21 +51,22 @@ const LIVE_SCRIPT = [
   { ret: +0.09, uw: 0.025, lw: 0.008, rate: 8 },
   { ret: -0.02, uw: 0.01, lw: 0.02, rate: 7 },
   { ret: +0.13, uw: 0.05, lw: 0.006, rate: 9 },
-  // 4 - 10 s: final run. Impulses of different sizes, short pullbacks, one
-  // indecision candle and one rejection; wicks vary (dips bought, profit
-  // taking). Up-moves are rescaled below so the run ends on FINAL_PRICE.
-  { ret: +0.17, uw: 0.05, lw: 0.012, rate: 10 }, // breakout, upper wick
-  { ret: +0.31, uw: 0.03, lw: 0.02, rate: 12 }, // impulse
-  { ret: -0.06, uw: 0.015, lw: 0.07, rate: 12 }, // pullback, dip bought (long lower wick)
-  { ret: +0.13, uw: 0.085, lw: 0.01, rate: 11 }, // up, profit taking (long upper wick)
-  { ret: -0.035, uw: 0.03, lw: 0.025, rate: 9 }, // small pause
-  { ret: +0.36, uw: 0.035, lw: 0.02, rate: 13 }, // impulse
-  { ret: +0.21, uw: 0.1, lw: 0.015, rate: 14 }, // up, long upper wick
-  { ret: -0.09, uw: 0.02, lw: 0.055, rate: 13 }, // correction
-  { ret: +0.05, uw: 0.07, lw: 0.05, rate: 11 }, // spinning top
-  { ret: +0.38, uw: 0.03, lw: 0.02, rate: 14 }, // impulse
-  { ret: -0.07, uw: 0.12, lw: 0.035, rate: 14 }, // rejection (long upper wick)
-  { ret: +0.33, uw: 0.04, lw: 0.03, rate: 14 }, // final push, closes at t = 9.98 s
+  // 4 - 10 s: final run. Impulses of different sizes and shapes at an
+  // irregular rhythm, single and two-candle pullbacks, an indecision candle
+  // and a rejection; wicks vary (dips bought, profit taking). Up-moves are
+  // rescaled below so the run ends on FINAL_PRICE.
+  { ret: +0.15, uw: 0.04, lw: 0.02, rate: 11 }, // breakout
+  { ret: +0.28, uw: 0.075, lw: 0.015, rate: 15 }, // impulse, profit taking at the top
+  { ret: -0.045, uw: 0.02, lw: 0.065, rate: 12 }, // pullback, dip bought
+  { ret: +0.1, uw: 0.03, lw: 0.045, rate: 11 }, // recovery
+  { ret: +0.36, uw: 0.025, lw: 0.02, rate: 16 }, // impulse
+  { ret: -0.03, uw: 0.04, lw: 0.02, rate: 10 }, // pause
+  { ret: -0.055, uw: 0.015, lw: 0.05, rate: 12 }, // second red candle
+  { ret: +0.24, uw: 0.03, lw: 0.06, rate: 14 }, // bounce from a dip
+  { ret: +0.34, uw: 0.05, lw: 0.015, rate: 16 }, // impulse
+  { ret: +0.04, uw: 0.09, lw: 0.04, rate: 12 }, // indecision, long upper wick
+  { ret: -0.075, uw: 0.06, lw: 0.045, rate: 13 }, // rejection
+  { ret: +0.3, uw: 0.02, lw: 0.035, rate: 22 }, // final push, closes at t = 9.9 s
 ];
 
 const fmtClock = (sec) => {
@@ -180,8 +182,9 @@ export function buildProMarket({ seed = 7, histSeed = 3, tradeSeed = 11 } = {}) 
     }
     const n = Math.max(1, Math.round(s.rate * CANDLE_S * (0.8 + 0.4 * trng())));
     // extremes before the close, so the close is the candle's last trade; the
-    // last candle closes at 0.955 (t = 9.98 s), before the video's last frame
-    const cf = lastCandle ? 0.955 : 0.98;
+    // last candle closes at 0.8 (t = 9.9 s), so the final price holds on screen
+    // for the video's last 6 frames
+    const cf = lastCandle ? 0.8 : 0.98;
     const fr = tradeFractions(trng, n, [Math.min(cf - 0.02, iMax / N), Math.min(cf - 0.02, iMin / N), cf], cf);
     const t0 = j * CANDLE_S;
     const churn = Math.min(0.55, Math.abs(s.ret) * 2.2); // profit-taking grows with the move
@@ -228,38 +231,49 @@ export function buildProMarket({ seed = 7, histSeed = 3, tradeSeed = 11 } = {}) 
     return out;
   }
 
-  // ---- log-scale auto range over the visible candles, eased, precomputed
+  // ---- log-scale auto range over the visible candles, precomputed. The
+  // targets look LOOK_S ahead and are eased, so the scale opens up smoothly
+  // before a spike instead of jumping when it prints (no zoom-like jolt).
   const steps = Math.ceil(DURATION * SAMPLE_HZ) + 1;
+  const dt = 1 / SAMPLE_HZ;
+  const LOOK = Math.round(0.4 * SAMPLE_HZ);
+  const lh = new Float64Array(steps);
+  const ll = new Float64Array(steps);
+  const vm = new Float64Array(steps);
+  for (let j = 0; j < steps; j++) {
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (const x of candlesAt(j * dt)) {
+      hi = Math.max(hi, x.h);
+      lo = Math.min(lo, x.l);
+      vm[j] = Math.max(vm[j], x.usd);
+    }
+    lh[j] = Math.log(hi);
+    ll[j] = Math.log(lo);
+  }
+  const ahead = (arr, j, f) => {
+    let v = -Infinity;
+    for (let k = j; k <= Math.min(steps - 1, j + LOOK); k++) v = Math.max(v, f(arr[k], k));
+    return v;
+  };
   const yTop = new Float64Array(steps);
   const yBot = new Float64Array(steps);
   const vTop = new Float64Array(steps);
-  const dt = 1 / SAMPLE_HZ;
   let sTop = 0;
   let sVol = 0;
   for (let j = 0; j < steps; j++) {
-    const cs = candlesAt(j * dt);
-    let hi = -Infinity;
-    let lo = Infinity;
-    let vmax = 0;
-    for (const x of cs) {
-      hi = Math.max(hi, x.h);
-      lo = Math.min(lo, x.l);
-      vmax = Math.max(vmax, x.usd);
-    }
-    const lh = Math.log(hi);
-    const ll = Math.log(lo);
-    const range = lh - ll;
-    const target = lh + 0.06 * range;
+    const target = ahead(lh, j, (h, k) => h + 0.06 * (h - ll[k]));
+    const vTarget = ahead(vm, j, (v) => v * 1.1);
     if (j === 0) {
       sTop = target;
-      sVol = vmax * 1.1;
+      sVol = vTarget;
     } else {
-      sTop += (target - sTop) * (1 - Math.exp(-dt / 0.18));
-      sVol += (vmax * 1.1 - sVol) * (1 - Math.exp(-dt / 0.25));
+      sTop += (target - sTop) * (1 - Math.exp(-dt / 0.15));
+      sVol += (vTarget - sVol) * (1 - Math.exp(-dt / 0.2));
     }
-    yTop[j] = Math.max(sTop, lh + 0.01 * range);
-    yBot[j] = ll - 0.04 * range;
-    vTop[j] = Math.max(sVol, vmax * 1.02);
+    yTop[j] = Math.max(sTop, lh[j] + 0.01 * (lh[j] - ll[j]));
+    yBot[j] = ll[j] - 0.04 * (yTop[j] - ll[j]);
+    vTop[j] = Math.max(sVol, vm[j] * 1.02);
   }
 
   const P0 = candles[HIST - VIS_HIST].o;

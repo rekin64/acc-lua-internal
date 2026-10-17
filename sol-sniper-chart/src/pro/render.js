@@ -3,7 +3,7 @@
 
 import { centsToString, formatPctBp, formatUsdCents, priceDecimals } from '../format.js';
 import { roundRect } from '../ui.js';
-import { REPLAY_SPEED, SLOTS } from './market.js';
+import { PLAYBACK_SPEED, SLOTS } from './market.js';
 
 const UI = 'Inter, system-ui, sans-serif';
 const NUM = '"Inter Tnum", Inter, system-ui, sans-serif';
@@ -69,6 +69,7 @@ function compactNum(v) {
   return v.toFixed(0);
 }
 const group = (n) => n.toLocaleString('en-US');
+const easeOut = (k) => 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
 const usd2 = (v) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function text(ctx, s, x, y, { font = `500 15px ${UI}`, color = C.text, align = 'left', base = 'middle', spacing = '0px' } = {}) {
@@ -580,13 +581,13 @@ function drawChart(ctx, s, position, pos, icons) {
   vline(ctx, rr, ry - 10, ry + 10);
   rr -= 18;
   rr -= text(ctx, `${s.clock} (UTC)`, rr, ry, { font: `500 14px ${NUM}`, color: C.text2, align: 'right' }) + 14;
-  // 1 s candles are replayed at 2x: 2 chart seconds per video second
-  const speed = `${REPLAY_SPEED}×`;
-  const rw = 10 + 12 + 6 + measure(ctx, 'Replay', `500 14px ${UI}`) + 5 + measure(ctx, speed, `600 14px ${NUM}`) + 10;
+  // 1 s candles play at 2x: 2 chart seconds per video second
+  const speed = `${PLAYBACK_SPEED}×`;
+  const rw = 10 + 12 + 6 + measure(ctx, 'Speed', `500 14px ${UI}`) + 5 + measure(ctx, speed, `600 14px ${NUM}`) + 10;
   pill(ctx, rr - rw, ry - 12, rw, 24, { fill: C.field, stroke: C.border, r: 6 });
   icon(ctx, icons, 'play', rr - rw + 10 + 6, ry, 12, 'active');
   let px = rr - rw + 10 + 12 + 6;
-  px += text(ctx, 'Replay', px, ry + 0.5, { font: `500 14px ${UI}`, color: C.text2 }) + 5;
+  px += text(ctx, 'Speed', px, ry + 0.5, { font: `500 14px ${UI}`, color: C.text2 }) + 5;
   text(ctx, speed, px, ry + 0.5, { font: `600 14px ${NUM}`, color: C.text });
 }
 
@@ -660,10 +661,11 @@ function drawPosition(ctx, position, pos) {
   text(ctx, pos.open ? centsToString(position.tokensHundredths) : dash, R, r.y + 302, { font: `600 16px ${NUM}`, color: pos.open ? C.text : C.text3, align: 'right' });
 }
 
-// Trades tape, newest first. Like a live terminal, a new trade is inserted at
-// the top at once (the top row is always the last trade) and its row flashes
-// briefly.
+// Trades tape, newest first. Like a live terminal, a new trade is inserted
+// at the top at once (the top row is always the last trade), fades in over
+// 120 ms and its row flashes briefly.
 const ROW_H = 30;
+const FADE_S = 0.12;
 const FLASH_S = 0.5;
 function drawTrades(ctx, s, t) {
   const r = TRADES;
@@ -702,6 +704,7 @@ function drawTrades(ctx, s, t) {
       ctx.fillStyle = buy ? `rgba(54, 224, 181, ${(0.12 * (1 - fk)).toFixed(3)})` : `rgba(240, 71, 95, ${(0.12 * (1 - fk)).toFixed(3)})`;
       ctx.fillRect(r.x + 1, y - ROW_H / 2, r.w - 2, ROW_H);
     }
+    ctx.globalAlpha = 0.35 + 0.65 * easeOut((t - tr.tv) / FADE_S);
     const bw = Math.min(100, Math.max(16, 16 + (Math.log10(Math.max(1, tr.usd)) / Math.log10(3000)) * 84));
     pill(ctx, R + 6 - bw, y - 11, bw, 22, { fill: buy ? 'rgba(54, 224, 181, 0.09)' : 'rgba(240, 71, 95, 0.10)', r: 4 });
     text(ctx, `${tr.age}s`, cols.age, y, { font: `500 15px ${NUM}`, color: C.text3 });
@@ -709,6 +712,7 @@ function drawTrades(ctx, s, t) {
     text(ctx, compactUsd(tr.price * 1e9), cols.mc, y, { font: `500 15px ${NUM}`, color: C.text });
     text(ctx, compactNum(tr.tokens), cols.amount, y, { font: `500 15px ${NUM}`, color: C.text2, align: 'right' });
     text(ctx, usd2(tr.usd), cols.value, y, { font: `600 15px ${NUM}`, color: c, align: 'right' });
+    ctx.globalAlpha = 1;
   });
   // older rows fade out at the bottom edge of the list
   const fb = r.y + r.h - 8;
