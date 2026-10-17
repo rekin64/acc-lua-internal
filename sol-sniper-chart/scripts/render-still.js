@@ -1,6 +1,7 @@
 // Renders a single frame of the chart to PNG.
 // Usage: node scripts/render-still.js [seconds=8] [out=out/preview_t8.png]
-// OVERLAY=0 renders the chart without the position overlay.
+// OVERLAY=0 renders the chart without the position overlay; PAGE=pro renders
+// the pro terminal layout (preview/pro.html).
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -20,7 +21,7 @@ try {
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const t = process.argv[2] ?? '8';
 const out = resolve(root, process.argv[3] ?? `out/preview_t${t}.png`);
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.otf': 'font/otf' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.otf': 'font/otf', '.svg': 'image/svg+xml' };
 
 const server = createServer(async (req, res) => {
   const path = normalize(join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname)));
@@ -40,7 +41,8 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, de
 page.on('pageerror', (e) => console.error('page error:', e.message));
 const hs = process.env.HIST_SEED ? `&hs=${process.env.HIST_SEED}` : '';
 const ov = process.env.OVERLAY === '0' ? '&overlay=0' : '';
-await page.goto(`http://127.0.0.1:${port}/preview/index.html?t=${t}${hs}${ov}`);
+const pageName = process.env.PAGE ?? 'index';
+await page.goto(`http://127.0.0.1:${port}/preview/${pageName}.html?t=${t}${hs}${ov}`);
 await page.waitForFunction(() => window.__ready === true, null, { timeout: 30000 });
 await page.locator('#c').screenshot({ path: out });
 await browser.close();

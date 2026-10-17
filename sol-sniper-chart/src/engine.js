@@ -18,7 +18,7 @@ export const HIST_COUNT = 30; // candles already on the chart at t = 0
 const HIST_SEED = 107;
 export const SLOTS = 48; // fixed x slots: the camera never moves
 
-function mulberry32(seed) {
+export function mulberry32(seed) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -29,7 +29,7 @@ function mulberry32(seed) {
   };
 }
 
-function gauss(rng) {
+export function gauss(rng) {
   let u = 0;
   while (u === 0) u = rng();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
@@ -103,7 +103,7 @@ function monotoneCubic(xs, ys) {
 }
 
 // Tick-level path from open to close that touches the target high and low.
-function makePath(o, c, hi, lo, dur, rng) {
+export function makePath(o, c, hi, lo, dur, rng) {
   const n = Math.round(dur * SAMPLE_HZ) + 1;
   const range = hi - lo;
   const green = c >= o;
