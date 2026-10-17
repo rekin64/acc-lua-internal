@@ -4,7 +4,7 @@
 
 import { W, H, SLOTS } from './engine.js';
 import { formatPct, formatPrice } from './format.js';
-import { drawEntryLine, drawEntryTag, drawPositionPanel } from './overlay.js';
+import { drawEntryLine, drawEntryTag, drawPositionPanel, drawSimStatus } from './overlay.js';
 import {
   THEME,
   PANEL,
@@ -234,6 +234,7 @@ export function drawFrame(ctx, t, market, assets, position = null) {
   ctx.fillText('$USELESS', titleX, HEADER_CY + 17);
   const tw = ctx.measureText('$USELESS').width;
   drawExternalLink(ctx, titleX + tw + 22, HEADER_CY - 17, 32, T.link);
+  if (position) drawSimStatus(ctx, t, Math.round(titleX + tw + 22 + 32 + 36), HEADER_CY);
 
   ctx.fillStyle = T.price;
   ctx.font = `700 50px ${FONT}`;

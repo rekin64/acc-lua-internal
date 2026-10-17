@@ -1,8 +1,7 @@
-// Checks, frame by frame, that the PNL panel (with its drop shadow), the ENTRY
-// tag, the entry dot and the dashed entry line never cover a candle (wick and
-// glow included for the panel and tag), a volume bar or another UI element,
-// and that the tag stays inside the plot.
-// Usage: node scripts/check-layout.js   (exit code 1 on any overlap)
+// Checks, frame by frame, that the PNL panel (with its drop shadow), the BUY
+// tag with its arrow and leader, the dashed entry line and the status badge
+// never cover a candle (wick and glow included for the panel and tag), a
+// volume bar or another UI element, and that the tag stays inside the plot.
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -41,7 +40,9 @@ const report = await page.evaluate(async () => {
   const { buildPosition } = await import('/src/position.js');
   const { loadTnumFonts } = await import('/src/fonts.js');
   const ui = await import('/src/ui.js');
-  const { PNL_BOX, entryTagBox, entryPoint, entryDotBox, entryLinePieces } = await import('/src/overlay.js');
+  const { PNL_BOX, entryTagBox, entryPoint, entryArrowBox, entryLinePieces, statusBox } = await import('/src/overlay.js');
+  const logo = await new Promise((ok) => Object.assign(new Image(), { onload() { ok(this); }, src: '/public/assets/solsniper-logo.png' }));
+  await Promise.all(['600 46px Inter', '700 50px Inter'].map((f) => document.fonts.load(f)));
   await loadTnumFonts((f) => `/public/fonts/${f}`);
   const ctx = document.createElement('canvas').getContext('2d');
   const market = buildMarket();
@@ -59,8 +60,23 @@ const report = await page.evaluate(async () => {
     { name: 'price axis', x: ui.SEP_X, y: ui.PRICE_TOP - 24, w: 1920 - ui.SEP_X, h: ui.VOL_BOT - ui.PRICE_TOP + 24 },
     { name: 'header', x: 0, y: 0, w: 1920, h: 160 },
   ];
-  const worst = { panel: { gap: Infinity }, tag: { gap: Infinity }, dot: { gap: Infinity }, line: { gap: Infinity } };
+  const worst = { panel: { gap: Infinity }, tag: { gap: Infinity }, dot: { gap: Infinity }, line: { gap: Infinity }, leader: { gap: Infinity } };
   const overlaps = [];
+  // header geometry exactly as render.js lays it out
+  const logoW = (logo.width / logo.height) * 64;
+  const divX = Math.round(52 + logoW + 34);
+  const avX = divX + 34 + 45;
+  const titleX = avX + 45 + 24;
+  ctx.font = '600 46px Inter';
+  const tw = ctx.measureText('$USELESS').width;
+  const linkRight = titleX + tw + 22 + 32;
+  const status = statusBox(ctx, Math.round(linkRight + 36), ui.HEADER_CY);
+  ctx.font = '700 50px Inter';
+  const priceLeft = ui.RIGHT - Math.max(ctx.measureText('$0.00001535').width, ctx.measureText('$0.0001380').width, ctx.measureText('+1,956%').width);
+  const statusReport = { box: status, gapToLink: Math.round(status.x - linkRight), gapToPrice: Math.round(priceLeft - (status.x + status.w)) };
+  if (status.x - linkRight < 16 || priceLeft - (status.x + status.w) < 40 || status.y < ui.PANEL.y + 20 || status.y + status.h > ui.PILL_Y - 20) {
+    overlaps.push({ frame: -1, box: 'status', with: 'header elements' });
+  }
   if (PNL_BOX.y - (ui.PILL_Y + ui.PILL_H) <= 0) overlaps.push({ frame: -1, box: 'panel', with: 'pills' });
   // panel plus its drop shadow: blur 28 (sigma 14, ~3 sigma = 42 px), offset y 10
   const panelShadow = { x: PNL_BOX.x - 42, y: PNL_BOX.y - 32, w: PNL_BOX.w + 84, h: PNL_BOX.h + 84 };
@@ -103,11 +119,18 @@ const report = await page.evaluate(async () => {
         overlaps.push({ frame: f, box: 'tag', with: 'plot bounds' });
       }
       // the dot must not touch any candle body/wick (glow allowed) nor a volume bar
-      const dot = entryDotBox(position, yOf);
+      const dot = entryArrowBox(position, yOf);
       for (const th of [...bodies, ...things.filter((x) => x.name.startsWith('volume'))]) {
         const g = gapOf(dot, th);
         if (g < 0) overlaps.push({ frame: f, box: 'dot', with: th.name });
         if (g < worst.dot.gap) worst.dot = { gap: Math.round(g * 10) / 10, frame: f, with: th.name };
+      }
+      // leader line from the tag to the arrow vs candle bodies and wicks
+      const leader = { x: tag.x + tag.w - 10, y: tag.y + tag.h, w: dot.x - (tag.x + tag.w - 10), h: dot.y + 1 - (tag.y + tag.h) };
+      for (const th of bodies) {
+        const g = gapOf(leader, th);
+        if (g < 0) overlaps.push({ frame: f, box: 'leader', with: th.name });
+        if (g < worst.leader.gap) worst.leader = { gap: Math.round(g * 10) / 10, frame: f, with: th.name };
       }
       // every dash piece (rows painted incl. anti-aliasing) vs every mark's pixel footprint
       const { y: ly, pieces } = entryLinePieces(position, yOf, marks);
@@ -143,6 +166,7 @@ const report = await page.evaluate(async () => {
     entrySlot: position.entrySlot,
     entryX: p.x,
     worstClearance: worst,
+    status: statusReport,
     overlapCount: overlaps.length,
     overlapsByElement: overlaps.reduce((acc, o) => {
       const k = `${o.box} x ${o.with}`;

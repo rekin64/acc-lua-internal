@@ -8,7 +8,8 @@ shown in a PNL panel.
 
 **Outputs** (H.264 High, 1920×1080, 60 fps, exactly 10.000 s / 600 frames, no audio, BT.709):
 
-- [`out/sol-sniper-useless-pnl.mp4`](out/sol-sniper-useless-pnl.mp4): chart, PNL panel and entry marker
+- [`out/sol-sniper-useless-pnl.mp4`](out/sol-sniper-useless-pnl.mp4): chart, PNL panel, BUY marker and
+  "Simulation Running" badge
 - [`out/sol-sniper-useless-pnl.jpg`](out/sol-sniper-useless-pnl.jpg): capture at t = 9.8 s (frame 588)
 - [`out/sol-sniper-useless.mp4`](out/sol-sniper-useless.mp4): original chart only
 - [`out/pnl-frames.csv`](out/pnl-frames.csv): displayed price and panel values for every frame
@@ -36,6 +37,9 @@ position · Excl. fees & slippage").
 - $500 opened at frame 30 (t = 0.500 s), the first frame whose header shows
   **$0.00001567**. This price trades inside the entry candle. Before entry,
   the panel shows "NO POSITION" and no value, PNL or ROI.
+- Panel rows: Invested, Entry Price, Tokens Held (500 / 0.00001567 =
+  31,908,104.66, fixed because nothing is sold), Current Price (the header
+  price), Current Value, Unrealized PNL, ROI.
 - All values come from the prices **as displayed**, in exact integer
   arithmetic (`src/position.js`):
   tokens = 500 / entry, value = tokens × price, PNL = value − 500,
@@ -45,14 +49,18 @@ position · Excl. fees & slippage").
   Final frames: $0.0001380 → $4,403.32, +$3,903.32, +780.66%. The ROI is
   measured from the entry, while the header % (+1,956%) is measured from the
   chart start.
-- Entry marker: a violet dot just left of the entry candle at the entry
-  price, a dashed line from the dot to the price axis, and an
-  `ENTRY — $500` tag. The line stops 1 px short of every candle and volume
-  bar, so the chart's own marks are never painted over.
+- BUY marker (from frame 30): a small turquoise arrow in the gap just left
+  of the entry candle, pointing at it at the entry price; a `BUY $500` tag
+  linked to the arrow by a short leader; and a thin violet dashed line at the
+  entry price running to the price axis. The line stops 1 px short of every
+  candle and volume bar, so the chart's own marks are never painted over.
+- "Simulation Running" badge in the top bar, after the $USELESS link icon. A
+  turquoise dot with a soft halo grows and fades over 2 s, with no blinking.
+  It is a visual simulation, with no connection to a bot or a blockchain.
 - `npm run check` verifies on all 600 frames that the panel (with its
-  shadow), the tag, the dot and the line never cover a candle, a volume bar,
-  the pills, the header or the price axis. Glow is included for the panel and
-  the tag.
+  shadow), the BUY tag, arrow and leader, the line and the status badge never
+  cover a candle, a volume bar, the pills, the header or the price axis. Glow
+  is included for the panel and the tag.
 - `npm run check:pixels` renders all 600 frames losslessly with and without
   the overlay. It confirms that 0 candle or volume-bar pixels change and that
   nothing changes outside the overlay's own areas.
@@ -94,7 +102,7 @@ Chrome headless shell instead of Remotion's download.
 
 - `src/engine.js`: deterministic market simulation (candles, tick paths, auto-scale)
 - `src/render.js`: Canvas 2D chart renderer, `drawFrame(ctx, t, market, assets, position?)`
-- `src/overlay.js`: PNL panel and entry marker
+- `src/overlay.js`: PNL panel, BUY marker and status badge
 - `src/position.js`: position math on displayed prices
 - `src/format.js`, `src/ui.js`, `src/fonts.js`: formatting, theme/layout, font loading
 - `src/remotion/`: Remotion composition (`SolSniperChart`, 1920×1080, 60 fps,

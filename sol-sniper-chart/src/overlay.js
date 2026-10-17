@@ -3,7 +3,7 @@
 // shown, and the panel is labelled "Simulated position".
 
 import { centsToString, formatPctBp, formatUsdCents } from './format.js';
-import { PITCH, SEP_X, THEME, roundRect, slotX } from './ui.js';
+import { BODY_W, PITCH, SEP_X, THEME, roundRect, slotX } from './ui.js';
 
 const TNUM = '"Inter Tnum", Inter, system-ui, sans-serif';
 
@@ -19,18 +19,22 @@ const C = {
   footnote: '#7280A8', // 4.9:1 on the panel, legible yet discreet
   brand: '#5B7BFB', // SOL Sniper wordmark blue (solsniper.com)
   violet: '#8777E0',
-  violetText: '#C9C2FF',
   blueText: '#AFC0FF',
   blueBg: 'rgba(59, 102, 240, 0.16)',
   blueBorder: 'rgba(59, 102, 240, 0.60)',
   idleBg: 'rgba(138, 151, 191, 0.10)',
   idleBorder: 'rgba(138, 151, 191, 0.30)',
   line: 'rgba(135, 119, 224, 0.80)',
-  tagBg: 'rgba(9, 13, 38, 0.90)',
-  tagBorder: 'rgba(135, 119, 224, 0.60)',
+  buy: THEME.up, // turquoise of the up candles
+  buyBg: 'rgba(7, 26, 32, 0.92)',
+  buyBorder: 'rgba(110, 240, 204, 0.55)',
+  statusText: '#C9D1E6',
+  statusBg: 'rgba(110, 240, 204, 0.07)',
+  statusBorder: 'rgba(110, 240, 204, 0.28)',
 };
 
-const DOT_R = 4;
+const ARROW_W = 9;
+const ARROW_H = 12;
 
 // ---- panel geometry -----------------------------------------------------
 const PAD = 24;
@@ -146,11 +150,11 @@ export function drawPositionPanel(ctx, position, pos, assets) {
   // position details
   const dash = DASH;
   let y = Y + HEAD_H;
-  row(ctx, y, ROW_H, 'Position Size', pos.open ? formatUsdCents(position.sizeCents) : dash);
+  row(ctx, y, ROW_H, 'Invested', pos.open ? formatUsdCents(position.sizeCents) : dash);
   y += ROW_H;
   row(ctx, y, ROW_H, 'Entry Price', pos.open ? position.entry.text : dash, { dot: pos.open ? C.violet : C.muted });
   y += ROW_H;
-  row(ctx, y, ROW_H, 'Tokens', pos.open ? centsToString(position.tokensHundredths) : dash);
+  row(ctx, y, ROW_H, 'Tokens Held', pos.open ? centsToString(position.tokensHundredths) : dash);
   y += ROW_H;
   row(ctx, y, ROW_H, 'Current Price', pos.price.text);
   y += ROW_H + GAP;
@@ -181,25 +185,28 @@ export function drawPositionPanel(ctx, position, pos, assets) {
   ctx.restore();
 }
 
-// ---- entry marker -------------------------------------------------------
-const TAG_TEXT = 'ENTRY — $500';
+// ---- BUY marker ---------------------------------------------------------
+const TAG_TEXT = 'BUY $500';
 const TAG_H = 26;
 
-// The dot sits in the gap just left of the entry candle, so the candle itself
-// stays fully visible; the dashed line runs from it through the entry candle.
+// The arrow sits in the gap just left of the entry candle and points at it at
+// the entry price, so the candle itself stays fully visible; the dashed line
+// runs from the arrow tip through the entry candle to the price axis.
 export function entryPoint(position, yOf) {
   return { x: slotX(position.entrySlot) - PITCH / 2, y: yOf(position.entryValue) };
 }
 
-export function entryDotBox(position, yOf) {
+// Right-pointing arrowhead, tip 3 px short of the entry candle body.
+export function entryArrowBox(position, yOf) {
   const p = entryPoint(position, yOf);
-  return { x: p.x - DOT_R, y: p.y - DOT_R, w: 2 * DOT_R, h: 2 * DOT_R };
+  const tip = slotX(position.entrySlot) - BODY_W / 2 - 3;
+  return { x: tip - ARROW_W, y: p.y - ARROW_H / 2, w: ARROW_W, h: ARROW_H };
 }
 
 export function entryTagBox(ctx, position, yOf) {
   const p = entryPoint(position, yOf);
   ctx.save();
-  ctx.font = `600 15px ${TNUM}`;
+  ctx.font = `700 15px ${TNUM}`;
   ctx.letterSpacing = '1px';
   const w = ctx.measureText(TAG_TEXT).width + 22;
   ctx.restore();
@@ -217,7 +224,7 @@ const MIN_PIECE = 3; // drop dash fragments shorter than this (px)
 export function entryLinePieces(position, yOf, marks = []) {
   const p = entryPoint(position, yOf);
   const row = Math.floor(p.y);
-  const x0 = p.x + DOT_R + 2;
+  const x0 = slotX(position.entrySlot) - BODY_W / 2 - 1;
   const x1 = SEP_X - 6;
   // rows painted by a 1.5 px stroke centred on row + 0.5 (anti-aliasing included)
   const top = row - 1;
@@ -250,27 +257,81 @@ export function drawEntryLine(ctx, position, yOf, marks = []) {
   ctx.restore();
 }
 
-// Entry dot and "ENTRY — $500" tag, above the candles.
+// BUY arrow and "BUY $500" tag, above the candles.
 export function drawEntryTag(ctx, position, yOf) {
   const p = entryPoint(position, yOf);
+  const a = entryArrowBox(position, yOf);
   const b = entryTagBox(ctx, position, yOf);
   ctx.save();
   ctx.beginPath();
-  ctx.arc(p.x, p.y, DOT_R, 0, Math.PI * 2);
-  ctx.fillStyle = C.violet;
+  ctx.moveTo(a.x + a.w, p.y);
+  ctx.lineTo(a.x, a.y);
+  ctx.lineTo(a.x, a.y + a.h);
+  ctx.closePath();
+  ctx.fillStyle = C.buy;
   ctx.fill();
 
+  // short leader from the tag to the arrow, so they read as one marker
+  ctx.beginPath();
+  ctx.moveTo(b.x + b.w - 10, b.y + b.h);
+  ctx.lineTo(a.x - 1, a.y + 1);
+  ctx.strokeStyle = 'rgba(110, 240, 204, 0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
   roundRect(ctx, b.x, b.y, b.w, b.h, 7);
-  ctx.fillStyle = C.tagBg;
+  ctx.fillStyle = C.buyBg;
   ctx.fill();
   ctx.lineWidth = 1;
-  ctx.strokeStyle = C.tagBorder;
+  ctx.strokeStyle = C.buyBorder;
   ctx.stroke();
-  ctx.font = `600 15px ${TNUM}`;
+  ctx.font = `700 15px ${TNUM}`;
   ctx.letterSpacing = '1px';
-  ctx.fillStyle = C.violetText;
+  ctx.fillStyle = C.buy;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(TAG_TEXT, b.x + b.w / 2 + 0.5, b.y + b.h / 2 + 1);
+  ctx.restore();
+}
+
+// ---- "Simulation Running" status badge (top bar) -------------------------
+const STATUS_TEXT = 'Simulation Running';
+const STATUS_H = 36;
+const PULSE_S = 2; // one slow halo every 2 s
+
+export function statusBox(ctx, x, cy) {
+  ctx.save();
+  ctx.font = `500 19px ${TNUM}`;
+  const w = 14 + 10 + 12 + ctx.measureText(STATUS_TEXT).width + 16;
+  ctx.restore();
+  return { x, y: cy - STATUS_H / 2, w, h: STATUS_H };
+}
+
+export function drawSimStatus(ctx, t, x, cy) {
+  const b = statusBox(ctx, x, cy);
+  ctx.save();
+  roundRect(ctx, b.x, b.y, b.w, b.h, STATUS_H / 2);
+  ctx.fillStyle = C.statusBg;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = C.statusBorder;
+  ctx.stroke();
+  // dot with a soft halo that slowly grows and fades (no blinking)
+  const dx = b.x + 14 + 5;
+  const ph = (t % PULSE_S) / PULSE_S;
+  const ease = 1 - (1 - ph) * (1 - ph);
+  ctx.beginPath();
+  ctx.arc(dx, cy, 5 + 7 * ease, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(110, 240, 204, ${(0.32 * (1 - ph)).toFixed(3)})`;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(dx, cy, 5, 0, Math.PI * 2);
+  ctx.fillStyle = C.buy;
+  ctx.fill();
+  ctx.font = `500 19px ${TNUM}`;
+  ctx.fillStyle = C.statusText;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(STATUS_TEXT, dx + 5 + 12, cy + 1);
   ctx.restore();
 }

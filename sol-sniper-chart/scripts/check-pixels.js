@@ -42,7 +42,7 @@ const report = await page.evaluate(async () => {
   const { drawFrame } = await import('/src/render.js');
   const { loadTnumFonts } = await import('/src/fonts.js');
   const ui = await import('/src/ui.js');
-  const { PNL_BOX, entryTagBox, entryDotBox, entryLinePieces } = await import('/src/overlay.js');
+  const { PNL_BOX, entryTagBox, entryArrowBox, entryLinePieces, statusBox } = await import('/src/overlay.js');
   await Promise.all(['500 22px Inter', '500 28px Inter', '600 46px Inter', '700 50px Inter'].map((f) => document.fonts.load(f)));
   await loadTnumFonts((f) => `/public/fonts/${f}`);
   const load = (src) => new Promise((ok, ko) => Object.assign(new Image(), { onload() { ok(this); }, onerror: ko, src }));
@@ -85,6 +85,7 @@ const report = await page.evaluate(async () => {
     };
     // panel + drop shadow: blur 28 (sigma 14, ~3 sigma = 42 px), offset y 10
     mark(PNL_BOX.x - 42, PNL_BOX.y - 32, PNL_BOX.x + PNL_BOX.w + 42, PNL_BOX.y + PNL_BOX.h + 52, zone);
+    { const sb = statusBox(a, 800, ui.HEADER_CY); mark(760, sb.y - 4, 1100, sb.y + sb.h + 4, zone); } // status badge row
     // chart marks, exactly as render.js builds them
     const marksArr = new Uint8Array(W * H);
     const marks = [];
@@ -108,8 +109,9 @@ const report = await page.evaluate(async () => {
     if (position.at(t).open) {
       const tag = entryTagBox(a, position, yOf);
       mark(tag.x - 2, tag.y - 2, tag.x + tag.w + 2, tag.y + tag.h + 2, zone);
-      const dot = entryDotBox(position, yOf);
+      const dot = entryArrowBox(position, yOf);
       mark(dot.x - 2, dot.y - 2, dot.x + dot.w + 2, dot.y + dot.h + 2, zone);
+      mark(tag.x + tag.w - 12, tag.y + tag.h - 1, dot.x + 1, dot.y + 3, zone); // leader
       const { y, pieces } = entryLinePieces(position, yOf, marks);
       for (const [x0, x1] of pieces) mark(x0 - 1, y - 2, x1 + 1, y + 2, zone);
     }
