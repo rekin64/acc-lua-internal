@@ -3,7 +3,7 @@
 // shown, and the panel is labelled "Simulated position".
 
 import { centsToString, formatPctBp, formatUsdCents } from './format.js';
-import { BODY_W, PITCH, SEP_X, THEME, roundRect, slotX } from './ui.js';
+import { PITCH, SEP_X, THEME, roundRect, slotX } from './ui.js';
 
 const TNUM = '"Inter Tnum", Inter, system-ui, sans-serif';
 
@@ -33,7 +33,7 @@ const C = {
   statusBorder: 'rgba(110, 240, 204, 0.28)',
 };
 
-const ARROW_W = 9;
+const ARROW_W = 8;
 const ARROW_H = 12;
 
 // ---- panel geometry -----------------------------------------------------
@@ -196,11 +196,11 @@ export function entryPoint(position, yOf) {
   return { x: slotX(position.entrySlot) - PITCH / 2, y: yOf(position.entryValue) };
 }
 
-// Right-pointing arrowhead, tip 3 px short of the entry candle body.
+// Right-pointing arrowhead, centred in the gap between candles 29 and 30 so
+// it is clearly separate from both (3.5 px each side).
 export function entryArrowBox(position, yOf) {
   const p = entryPoint(position, yOf);
-  const tip = slotX(position.entrySlot) - BODY_W / 2 - 3;
-  return { x: tip - ARROW_W, y: p.y - ARROW_H / 2, w: ARROW_W, h: ARROW_H };
+  return { x: p.x - ARROW_W / 2, y: p.y - ARROW_H / 2, w: ARROW_W, h: ARROW_H };
 }
 
 export function entryTagBox(ctx, position, yOf) {
@@ -224,7 +224,7 @@ const MIN_PIECE = 3; // drop dash fragments shorter than this (px)
 export function entryLinePieces(position, yOf, marks = []) {
   const p = entryPoint(position, yOf);
   const row = Math.floor(p.y);
-  const x0 = slotX(position.entrySlot) - BODY_W / 2 - 1;
+  const x0 = p.x + 6;
   const x1 = SEP_X - 6;
   // rows painted by a 1.5 px stroke centred on row + 0.5 (anti-aliasing included)
   const top = row - 1;

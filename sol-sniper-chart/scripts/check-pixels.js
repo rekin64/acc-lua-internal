@@ -85,7 +85,14 @@ const report = await page.evaluate(async () => {
     };
     // panel + drop shadow: blur 28 (sigma 14, ~3 sigma = 42 px), offset y 10
     mark(PNL_BOX.x - 42, PNL_BOX.y - 32, PNL_BOX.x + PNL_BOX.w + 42, PNL_BOX.y + PNL_BOX.h + 52, zone);
-    { const sb = statusBox(a, 800, ui.HEADER_CY); mark(760, sb.y - 4, 1100, sb.y + sb.h + 4, zone); } // status badge row
+    {
+      // status badge, placed exactly as render.js places it (after the link icon)
+      const logoW = (assets.logo.width / assets.logo.height) * 64;
+      const titleX = Math.round(52 + logoW + 34) + 34 + 45 + 45 + 24;
+      a.font = '600 46px Inter';
+      const sb = statusBox(a, Math.round(titleX + a.measureText('$USELESS').width + 22 + 32 + 36), ui.HEADER_CY);
+      mark(sb.x - 2, sb.y - 2, sb.x + sb.w + 2, sb.y + sb.h + 2, zone);
+    }
     // chart marks, exactly as render.js builds them
     const marksArr = new Uint8Array(W * H);
     const marks = [];
