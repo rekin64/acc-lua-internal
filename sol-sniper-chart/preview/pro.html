@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>SOL Sniper pro terminal preview</title>
+    <style>
+      html, body { margin: 0; background: #05060f; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1920" height="1080"></canvas>
+    <script type="module">
+      import { loadTnumFonts } from '../src/fonts.js';
+      import { buildPosition } from '../src/position.js';
+      import { loadIcons } from '../src/pro/icons.js';
+      import { buildProMarket } from '../src/pro/market.js';
+      import { drawProFrame } from '../src/pro/render.js';
+
+      const load = (src) =>
+        new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = rej;
+          im.src = src;
+        });
+
+      // ?t=9.5 time in seconds
+      const t = parseFloat(new URLSearchParams(location.search).get('t') ?? '9.5');
+      await Promise.all(['400 15px Inter', '500 15px Inter', '600 15px Inter', '700 15px Inter', '800 11px Inter'].map((f) => document.fonts.load(f)));
+      await loadTnumFonts((file) => `../public/fonts/${file}`);
+      const icons = await loadIcons((file) => `../public/icons/${file}`);
+      const assets = {
+        logo: await load('../public/assets/solsniper-logo.png'),
+        token: await load('../public/assets/useless.png'),
+        sol: await load('../public/assets/solana-sol.png'),
+      };
+      const market = buildProMarket();
+      const position = buildPosition(market);
+      const ctx = document.getElementById('c').getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      drawProFrame(ctx, t, market, position, assets, icons);
+      window.__ready = true;
+    </script>
+  </body>
+</html>
