@@ -20,7 +20,10 @@ export const LIVE = Math.round(DURATION / CANDLE_S); // 20 candles form during t
 export const SLOTS = 100; // fixed x slots: 76 history + 20 live + right margin
 export const SUPPLY = 1e9; // USELESS total supply
 const ENTRY_PRICE = 0.00001567; // last trade when the simulated position opens (t = 0.5 s)
-const FINAL_PRICE = 0.0001043; // last trade of the video (closes the last candle at t = 9.9 s)
+// Last trade of the video (closes the last candle at t = 9.8 s). It is the
+// last trade of the mockup the client reviewed, so the end shows the same
+// price ($0.0001043), PNL, ROI and 5m change.
+const FINAL_PRICE = 0.000104295;
 const RISE_FROM = 8; // first candle of the final run (t = 4 s)
 const POOL_USD_AT_ENTRY = 5000; // USD side of the pool at the entry price
 export const CLOCK0 = 14 * 3600 + 30 * 60 + 40; // chart clock of history candle 0 (14:30:40)
@@ -55,18 +58,18 @@ const LIVE_SCRIPT = [
   // irregular rhythm, single and two-candle pullbacks, an indecision candle
   // and a rejection; wicks vary (dips bought, profit taking). Up-moves are
   // rescaled below so the run ends on FINAL_PRICE.
-  { ret: +0.15, uw: 0.04, lw: 0.02, rate: 11 }, // breakout
-  { ret: +0.28, uw: 0.075, lw: 0.015, rate: 15 }, // impulse, profit taking at the top
+  { ret: +0.17, uw: 0.04, lw: 0.02, rate: 11 }, // breakout
+  { ret: +0.32, uw: 0.075, lw: 0.015, rate: 15 }, // impulse, profit taking at the top
   { ret: -0.045, uw: 0.02, lw: 0.065, rate: 12 }, // pullback, dip bought
-  { ret: +0.1, uw: 0.03, lw: 0.045, rate: 11 }, // recovery
   { ret: +0.36, uw: 0.025, lw: 0.02, rate: 16 }, // impulse
+  { ret: +0.08, uw: 0.06, lw: 0.02, rate: 11 }, // momentum fades
   { ret: -0.03, uw: 0.04, lw: 0.02, rate: 10 }, // pause
   { ret: -0.055, uw: 0.015, lw: 0.05, rate: 12 }, // second red candle
-  { ret: +0.24, uw: 0.03, lw: 0.06, rate: 14 }, // bounce from a dip
-  { ret: +0.34, uw: 0.05, lw: 0.015, rate: 16 }, // impulse
-  { ret: +0.04, uw: 0.09, lw: 0.04, rate: 12 }, // indecision, long upper wick
+  { ret: +0.27, uw: 0.03, lw: 0.06, rate: 14 }, // bounce from a dip
+  { ret: +0.38, uw: 0.05, lw: 0.015, rate: 16 }, // impulse
+  { ret: +0.05, uw: 0.09, lw: 0.04, rate: 12 }, // indecision, long upper wick
   { ret: -0.075, uw: 0.06, lw: 0.045, rate: 13 }, // rejection
-  { ret: +0.3, uw: 0.02, lw: 0.035, rate: 22 }, // final push, closes at t = 9.9 s
+  { ret: +0.33, uw: 0.02, lw: 0.035, rate: 22 }, // final push, closes at t = 9.8 s
 ];
 
 const fmtClock = (sec) => {
@@ -182,9 +185,9 @@ export function buildProMarket({ seed = 7, histSeed = 3, tradeSeed = 11 } = {}) 
     }
     const n = Math.max(1, Math.round(s.rate * CANDLE_S * (0.8 + 0.4 * trng())));
     // extremes before the close, so the close is the candle's last trade; the
-    // last candle closes at 0.8 (t = 9.9 s), so the final price holds on screen
-    // for the video's last 6 frames
-    const cf = lastCandle ? 0.8 : 0.98;
+    // last candle closes at 0.6 (t = 9.8 s), so the final price holds on screen
+    // for the video's last 12 frames
+    const cf = lastCandle ? 0.6 : 0.98;
     const fr = tradeFractions(trng, n, [Math.min(cf - 0.02, iMax / N), Math.min(cf - 0.02, iMin / N), cf], cf);
     const t0 = j * CANDLE_S;
     const churn = Math.min(0.55, Math.abs(s.ret) * 2.2); // profit-taking grows with the move
@@ -231,12 +234,18 @@ export function buildProMarket({ seed = 7, histSeed = 3, tradeSeed = 11 } = {}) 
     return out;
   }
 
-  // ---- log-scale auto range over the visible candles, precomputed. The
-  // targets look LOOK_S ahead and are eased, so the scale opens up smoothly
-  // before a spike instead of jumping when it prints (no zoom-like jolt).
+  // ---- log-scale auto range over the visible candles, precomputed. A
+  // critically damped follower (two first-order lags) moves the scale without
+  // a jolt. It looks only 80 ms (5 frames) ahead, and a fresh high may sit up
+  // to OVERSHOOT of the price pane above its top margin (a fresh volume bar up
+  // to VOL_OVERSHOOT of its pane), so a single large trade never forces a
+  // jump; the scale then eases to make room.
   const steps = Math.ceil(DURATION * SAMPLE_HZ) + 1;
   const dt = 1 / SAMPLE_HZ;
-  const LOOK = Math.round(0.4 * SAMPLE_HZ);
+  const LOOK = Math.round(0.08 * SAMPLE_HZ);
+  const TAU = 0.06;
+  const OVERSHOOT = 1.067;
+  const VOL_OVERSHOOT = 1.15;
   const lh = new Float64Array(steps);
   const ll = new Float64Array(steps);
   const vm = new Float64Array(steps);
@@ -259,21 +268,29 @@ export function buildProMarket({ seed = 7, histSeed = 3, tradeSeed = 11 } = {}) 
   const yTop = new Float64Array(steps);
   const yBot = new Float64Array(steps);
   const vTop = new Float64Array(steps);
+  const ease = 1 - Math.exp(-dt / TAU);
+  let aTop = 0;
   let sTop = 0;
+  let aVol = 0;
   let sVol = 0;
   for (let j = 0; j < steps; j++) {
-    const target = ahead(lh, j, (h, k) => h + 0.06 * (h - ll[k]));
+    const target = ahead(lh, j, (h, q) => h + 0.06 * (h - ll[q]));
     const vTarget = ahead(vm, j, (v) => v * 1.1);
     if (j === 0) {
-      sTop = target;
-      sVol = vTarget;
+      aTop = sTop = target;
+      aVol = sVol = vTarget;
     } else {
-      sTop += (target - sTop) * (1 - Math.exp(-dt / 0.15));
-      sVol += (vTarget - sVol) * (1 - Math.exp(-dt / 0.2));
+      aTop += (target - aTop) * ease;
+      sTop += (aTop - sTop) * ease;
+      aVol += (vTarget - aVol) * ease;
+      sVol += (aVol - sVol) * ease;
     }
-    yTop[j] = Math.max(sTop, lh[j] + 0.01 * (lh[j] - ll[j]));
+    // lowest top that keeps the high within OVERSHOOT of the pane, given
+    // that the bottom sits 4% of (top - low) under the low
+    const minTop = (lh[j] + 1.04 * (OVERSHOOT - 1) * ll[j]) / (1.04 * OVERSHOOT - 0.04);
+    yTop[j] = Math.max(sTop, minTop);
     yBot[j] = ll[j] - 0.04 * (yTop[j] - ll[j]);
-    vTop[j] = Math.max(sVol, vm[j] * 1.02);
+    vTop[j] = Math.max(sVol, vm[j] / VOL_OVERSHOOT);
   }
 
   const P0 = candles[HIST - VIS_HIST].o;

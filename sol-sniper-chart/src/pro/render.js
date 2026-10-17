@@ -58,11 +58,15 @@ const BODY_W = 9;
 export const slotX = (i) => SLOT_X0 + (i + 0.5) * PITCH;
 
 // ---- small helpers ----------------------------------------------------------------
+// Half-up rounding ($80,550 -> $80.6K).
 function compactUsd(v) {
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
-  if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
-  return `$${v.toFixed(0)}`;
+  if (v >= 1e6) return `$${(Math.round(v / 1e4) / 100).toFixed(2)}M`;
+  if (v >= 1e3) return `$${(Math.round(v / 100) / 10).toFixed(1)}K`;
+  return `$${Math.round(v)}`;
 }
+// Market cap as shown: from the 4-significant-digit price on screen, so the
+// two always agree ($0.00008055 -> $80.6K).
+const mcOf = (p) => Math.round(Number(p.toFixed(priceDecimals(p))) * 1e9);
 function compactNum(v) {
   if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
   if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
@@ -282,7 +286,7 @@ function drawTokenBar(ctx, s, assets, icons) {
 
   const val = (v, x, color = C.text) => text(ctx, v, x, VY, { font: `600 19px ${NUM}`, color });
   lab('Market Cap', 590);
-  val(compactUsd(s.mcap), 590);
+  val(compactUsd(mcOf(s.price)), 590);
   lab('Liquidity', 750);
   val(compactUsd(s.liquidity), 750);
   lab('Volume 5m', 910);
@@ -709,7 +713,7 @@ function drawTrades(ctx, s, t) {
     pill(ctx, R + 6 - bw, y - 11, bw, 22, { fill: buy ? 'rgba(54, 224, 181, 0.09)' : 'rgba(240, 71, 95, 0.10)', r: 4 });
     text(ctx, `${tr.age}s`, cols.age, y, { font: `500 15px ${NUM}`, color: C.text3 });
     text(ctx, buy ? 'Buy' : 'Sell', cols.type, y, { font: `600 15px ${UI}`, color: c });
-    text(ctx, compactUsd(tr.price * 1e9), cols.mc, y, { font: `500 15px ${NUM}`, color: C.text });
+    text(ctx, compactUsd(mcOf(tr.price)), cols.mc, y, { font: `500 15px ${NUM}`, color: C.text });
     text(ctx, compactNum(tr.tokens), cols.amount, y, { font: `500 15px ${NUM}`, color: C.text2, align: 'right' });
     text(ctx, usd2(tr.usd), cols.value, y, { font: `600 15px ${NUM}`, color: c, align: 'right' });
     ctx.globalAlpha = 1;
