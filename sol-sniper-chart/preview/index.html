@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>SOL Sniper chart preview</title>
+    <style>
+      html, body { margin: 0; background: #01040b; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1920" height="1080"></canvas>
+    <script type="module">
+      import { buildMarket } from '../src/engine.js';
+      import { loadTnumFonts } from '../src/fonts.js';
+      import { buildPosition } from '../src/position.js';
+      import { drawFrame } from '../src/render.js';
+
+      const load = (src) =>
+        new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = rej;
+          im.src = src;
+        });
+
+      // ?t=8 time in seconds, ?overlay=0 draws the chart without the position
+      const params = new URLSearchParams(location.search);
+      const t = parseFloat(params.get('t') ?? '8');
+      await Promise.all(['500 28px Inter', '600 46px Inter', '700 50px Inter'].map((f) => document.fonts.load(f)));
+      await loadTnumFonts((file) => `../public/fonts/${file}`);
+      const assets = {
+        logo: await load('../public/assets/solsniper-logo.png'),
+        token: await load('../public/assets/useless.png'),
+        icon: await load('../public/assets/solsniper-icon.png'),
+      };
+      const ctx = document.getElementById('c').getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      const hs = params.get('hs');
+      const market = hs ? buildMarket(undefined, Number(hs)) : buildMarket();
+      const position = params.get('overlay') === '0' ? null : buildPosition(market);
+      drawFrame(ctx, t, market, assets, position);
+      window.__ready = true;
+    </script>
+  </body>
+</html>

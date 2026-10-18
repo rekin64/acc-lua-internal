@@ -1,0 +1,8 @@
+node_modules/
+out/*
+!out/sol-sniper-useless.mp4
+!out/sol-sniper-useless-pnl.mp4
+!out/sol-sniper-useless-pnl.jpg
+!out/pnl-frames.csv
+!out/sol-sniper-pro-mockup.png
+!out/sol-sniper-pro-mockup-sheet.png
