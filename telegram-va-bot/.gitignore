@@ -1,0 +1,13 @@
+# Secrets et données locales : ne jamais les partager ni les committer
+.env
+data/
+*.session
+*.session-journal
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
